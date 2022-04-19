@@ -1,7 +1,7 @@
 ﻿using System;
 
-namespace Tedd.MOS65xx.Emulator.Enums
-{
+namespace Tedd.MOS65xx.Emulator.Enums;
+
     public enum PlusCycles
     {
         /// <summary>
@@ -300,6 +300,3 @@ namespace Tedd.MOS65xx.Emulator.Enums
 
 
     }
-
-
-}

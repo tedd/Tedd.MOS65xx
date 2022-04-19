@@ -1,12 +1,11 @@
-namespace Tedd.MOS65xx.Emulator.Enums
+namespace Tedd.MOS65xx.Emulator.Enums;
+
+public enum Param
 {
-    public enum Param
-    {
-        imm,
-        abs,
-        ind,
-        rel,
-        zpg,
-        impl
-    }
+    imm,
+    abs,
+    ind,
+    rel,
+    zpg,
+    impl
 }
