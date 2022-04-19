@@ -13,43 +13,43 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
 
             public bool C
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.C); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.C, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.C); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.C, value); }
             }
             public bool Z
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.Z); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.Z, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.Z); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.Z, value); }
             }
             public bool I
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.I); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.I, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.I); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.I, value); }
             }
             public bool D
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.D); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.D, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.D); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.D, value); }
             }
             public bool B
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.B); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.B, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.B); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.B, value); }
             }
             public bool Unused
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.Unused); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.Unused, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.Unused); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.Unused, value); }
             }
             public bool V
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.V); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.V, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.V); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.V, value); }
             }
             public bool N
             {
-                get { return Utils.BitUtils.IsBitSet(_reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.N); }
-                set { Utils.BitUtils.SetBit(ref _reg.ProcessorStatusFlags, (int)Enums.ProcessorStatusFlags.N, value); }
+                get { return _reg.ProcessorStatusFlags.IsBitSet((int)Enums.ProcessorStatusFlags.N); }
+                set { _reg.ProcessorStatusFlags.SetBit((int)Enums.ProcessorStatusFlags.N, value); }
             }
         }
 

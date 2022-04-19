@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Tedd.MOS65xx.Emulator.Utils;
 
 namespace Tedd.MOS65xx.Emulator.IO
 {
@@ -22,13 +21,13 @@ namespace Tedd.MOS65xx.Emulator.IO
         {
             var by = (UInt16)(_baseAddress + (index >> 3));
             var bi = (int)(index & 0x07);
-            return BitUtils.IsBitSet(_mb.MainMemory.Raw[by], bi);
+            return _mb.MainMemory.Raw[by].IsBitSet(bi);
         }
         public void SetBit(int index, bool value)
         {
             var by = (UInt16)(_baseAddress + (index >> 3));
             var bi = (int)(index & 0x07);
-            BitUtils.SetBit(ref _mb.MainMemory.Raw[by], bi, value);
+            _mb.MainMemory.Raw[by].SetBit(bi, value);
         }
     }
 }

@@ -1,14 +1,19 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
+
 using Tedd.MOS65xx.Emulator;
 using Tedd.MOS65xx.Emulator.Enums;
 
 namespace Tedd.MOS65xx.Tests
 {
-    [TestClass]
     public class OpcodeTest
     {
-        [TestMethod]
+        [SetUp]
+        public void Setup()
+        {
+        }
+
+        [Test]
         public void TestMethod1()
         {
             //var mos = new MOS6502();

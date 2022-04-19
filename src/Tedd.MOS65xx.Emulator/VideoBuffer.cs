@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 //using System.Windows.Media;
-using Tedd.MOS65xx.Emulator.Utils;
 
 namespace Tedd.MOS65xx.Emulator
 {

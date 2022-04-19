@@ -1,14 +1,19 @@
 ﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NUnit.Framework;
+
 using Tedd.MOS65xx.Emulator;
 using Tedd.MOS65xx.Emulator.Memory;
 
 namespace Tedd.MOS65xx.Tests
 {
-    [TestClass]
     public class MemoryTest
     {
-        [TestMethod]
+        [SetUp]
+        public void Setup()
+        {
+        }
+
+        [Test]
         public void Stack()
         {
             //var memory = new Memory();
