@@ -5,8 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Tedd.MOS65xx.Emulator.Cpu.MOS6510;
 
-namespace Tedd.MOS65xx.Emulator.Video
-{
+namespace Tedd.MOS65xx.Emulator.Video;
+
     public class VICII
     {
         // http://www.zimmers.net/cbmpics/cbm/c64/vic-ii.txt
@@ -22,5 +22,9 @@ namespace Tedd.MOS65xx.Emulator.Video
             Memory= new VICMemory(mb.MainMemory);
 
         }
+
+        internal void ExecuteOne()
+        {
+            
+        }
     }
-}

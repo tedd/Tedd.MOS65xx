@@ -16,24 +16,23 @@ using System.Windows.Shapes;
 
 using Tedd.MOS65xx.Emulator;
 
-namespace Tedd.MOS65xx.GUI
+namespace Tedd.MOS65xx.GUI;
+
+/// <summary>
+/// Interaction logic for MainWindow.xaml
+/// </summary>
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    private Computer Computer;
+    private Task _task;
+    private Tedd.WriteableBitmap Bitmap = new Tedd.WriteableBitmap(320, 200, 96, 96, PixelFormats.Bgra32, null);
+
+    public MainWindow()
     {
-        private Computer Computer;
-        private Task _task;
-        private Tedd.WriteableBitmap Bitmap = new Tedd.WriteableBitmap(320, 200, 96, 96, PixelFormats.Bgra32, null);
+        InitializeComponent();
+        Computer = new Computer();
 
-        public MainWindow()
-        {
-            InitializeComponent();
-            Computer = new Computer();
-            
 
-            _task = Task.Factory.StartNew(() => Computer.Run());
-        }
+        _task = Task.Factory.StartNew(() => Computer.Run());
     }
 }
