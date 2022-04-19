@@ -1,6 +1,8 @@
-﻿namespace Tedd.MOS65xx.Emulator.Enums.Memory
+﻿using System;
+
+namespace Tedd.MOS65xx.Emulator.Enums.Memory
 {
-    public enum Basic
+    public enum Basic : UInt16
     {
         // https://www.c64-wiki.com/wiki/BASIC-ROM
     

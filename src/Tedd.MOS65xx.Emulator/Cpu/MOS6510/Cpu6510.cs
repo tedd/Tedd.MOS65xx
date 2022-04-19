@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Tedd.MOS65xx.Emulator.Enums;
-using Tedd.MOS65xx.Emulator.Utils;
 using Word = System.UInt16;
 using OC = Tedd.MOS65xx.Emulator.Enums.OpCode;
 using PC = Tedd.MOS65xx.Emulator.Enums.PlusCycles;
@@ -698,7 +697,7 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte SetFlagsNz(byte val)
         {
-            Reg.Flag.N = BitUtils.IsBitSet(val, 7);
+            Reg.Flag.N = val.IsBitSet(7);
             Reg.Flag.Z = val == 0;
             return val;
         }
@@ -801,7 +800,7 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         {
             //if (pos >= _memory.Length)
             //    throw new Exception("Address " + pos + " outside of memory " + _memory.Length);
-            Reg.Flag.C = BitUtils.IsBitSet(val, 7);
+            Reg.Flag.C = val.IsBitSet(7);
             val <<= 1;
             Reg.Flag.Z = val == 0;
             return val;
@@ -828,7 +827,7 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         {
             //if (pos >= _memory.Length)
             //    throw new Exception("Address " + pos + " outside of memory " + _memory.Length);
-            Reg.Flag.C = Utils.BitUtils.IsBitSet(val, 0);
+            Reg.Flag.C = val.IsBitSet(0);
             val >>= 1;
             Reg.Flag.Z = val == 0;
             return val;
@@ -841,8 +840,8 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void BIT(byte val)
         {
-            Reg.Flag.N = BitUtils.IsBitSet(val, 7);
-            Reg.Flag.V = BitUtils.IsBitSet(val, 6);
+            Reg.Flag.N = val.IsBitSet(7);
+            Reg.Flag.V = val.IsBitSet(6);
             var result = val & Reg.A;
             Reg.Flag.Z = result == 0;
         }
@@ -871,7 +870,7 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         private byte ROL(byte value)
         {
             value = (byte)((value << 1) | (value >> 7));
-            Reg.Flag.C = Utils.BitUtils.IsBitSet(value, 7);
+            Reg.Flag.C = value.IsBitSet(7);
             SetFlagsNz(value);
             return value;
         }
@@ -884,7 +883,7 @@ namespace Tedd.MOS65xx.Emulator.Cpu.MOS6510
         private byte ROR(byte value)
         {
             value = (byte)((value >> 1) | (value << 7));
-            Reg.Flag.C = Utils.BitUtils.IsBitSet(value, 7);
+            Reg.Flag.C = value.IsBitSet(7);
             SetFlagsNz(value);
             return value;
         }

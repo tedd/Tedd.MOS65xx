@@ -1,6 +1,8 @@
-﻿namespace Tedd.MOS65xx.Emulator.Enums.Memory
+﻿using System;
+
+namespace Tedd.MOS65xx.Emulator.Enums.Memory
 {
-    public enum System
+    public enum System : UInt16
     {
         //HARDRESET = 0xFFFC, // Cold start machine
         HARDRESET = 0xFFF8, // Cold start machine

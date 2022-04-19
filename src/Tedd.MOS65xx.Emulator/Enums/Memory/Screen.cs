@@ -1,6 +1,7 @@
-﻿namespace Tedd.MOS65xx.Emulator.Enums.Memory
+﻿using System;
+namespace Tedd.MOS65xx.Emulator.Enums.Memory
 {
-    public enum Screen
+    public enum Screen : UInt16
     {
         SPRITE1 = 0x07F8, // value*64 = start address
         SPRITE2 = 0x07F9, // value*64 = start address

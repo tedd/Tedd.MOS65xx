@@ -1,5 +1,6 @@
 ﻿using System;
-using Tedd.MOS65xx.Emulator.Utils;
+
+using Tedd;
 
 namespace Tedd.MOS65xx.Emulator.Memory
 {
@@ -29,14 +30,14 @@ namespace Tedd.MOS65xx.Emulator.Memory
                 _baseAddress &= _maxMask;
                 var by = (UInt16)(_baseAddress + (index >> 3));
                 var bi = (int)(index & 0x07);
-                return BitUtils.IsBitSet(_memory.Raw[by], bi);
+                return _memory.Raw[by].IsBitSet(bi);
             }
             set
             {
                 _baseAddress &= _maxMask;
                 var by = (UInt16)(_baseAddress + (index >> 3));
                 var bi = (int)(index & 0x07);
-                BitUtils.SetBit(ref _memory.Raw[by], bi, value);
+                _memory.Raw[by].SetBit(bi, value);
             }
         }
     }

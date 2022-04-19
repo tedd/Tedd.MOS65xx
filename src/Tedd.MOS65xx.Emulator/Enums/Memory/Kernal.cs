@@ -1,6 +1,8 @@
-﻿namespace Tedd.MOS65xx.Emulator.Enums.Memory
+﻿using System;
+
+namespace Tedd.MOS65xx.Emulator.Enums.Memory
 {
-    public enum Kernal
+    public enum Kernal : UInt16
     {
         // https://www.c64-wiki.com/wiki/Kernal
         ACPTR	 = 0xFFA5, // Input byte from serial port

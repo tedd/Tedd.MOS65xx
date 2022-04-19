@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Tedd.MOS65xx.Emulator.Cpu.MOS6510;
 using Tedd.MOS65xx.Emulator.IO;
-using Tedd.MOS65xx.Emulator.Utils;
 using Tedd.MOS65xx.Emulator.Video;
 
 namespace Tedd.MOS65xx.Emulator

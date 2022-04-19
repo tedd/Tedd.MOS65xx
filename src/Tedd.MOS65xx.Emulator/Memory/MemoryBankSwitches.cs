@@ -1,5 +1,4 @@
-﻿using Tedd.MOS65xx.Emulator.Utils;
-
+﻿
 namespace Tedd.MOS65xx.Emulator.Memory
 {
     public class MemoryBankSwitches
@@ -12,28 +11,28 @@ namespace Tedd.MOS65xx.Emulator.Memory
         }
         public bool EXROM
         {
-            get { return BitUtils.IsBitSet(_memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.EXROM); }
-            set { BitUtils.SetBit(ref _memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.EXROM, value); }
+            get { return _memory.Raw[Memory.POS_PP_BANKSWITCHES].IsBitSet((int)MemoryBankSwitchEnum.EXROM); }
+            set { _memory.Raw[Memory.POS_PP_BANKSWITCHES].SetBit((int)MemoryBankSwitchEnum.EXROM, value); }
         }
         public bool GAME
         {
-            get { return BitUtils.IsBitSet(_memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.GAME); }
-            set { BitUtils.SetBit(ref _memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.GAME, value); }
+            get { return _memory.Raw[Memory.POS_PP_BANKSWITCHES].IsBitSet((int)MemoryBankSwitchEnum.GAME); }
+            set { _memory.Raw[Memory.POS_PP_BANKSWITCHES].SetBit((int)MemoryBankSwitchEnum.GAME, value); }
         }
         public bool CHAREN
         {
-            get { return BitUtils.IsBitSet(_memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.CHAREN); }
-            set { BitUtils.SetBit(ref _memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.CHAREN, value); }
+            get { return _memory.Raw[Memory.POS_PP_BANKSWITCHES].IsBitSet((int)MemoryBankSwitchEnum.CHAREN); }
+            set { _memory.Raw[Memory.POS_PP_BANKSWITCHES].SetBit((int)MemoryBankSwitchEnum.CHAREN, value); }
         }
         public bool HIRAM
         {
-            get { return BitUtils.IsBitSet(_memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.HIRAM); }
-            set { BitUtils.SetBit(ref _memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.HIRAM, value); }
+            get { return _memory.Raw[Memory.POS_PP_BANKSWITCHES].IsBitSet((int)MemoryBankSwitchEnum.HIRAM); }
+            set { _memory.Raw[Memory.POS_PP_BANKSWITCHES].SetBit((int)MemoryBankSwitchEnum.HIRAM, value); }
         }
         public bool LORAM
         {
-            get { return BitUtils.IsBitSet(_memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.LORAM); }
-            set { BitUtils.SetBit(ref _memory.Raw[Memory.POS_PP_BANKSWITCHES], (int)MemoryBankSwitchEnum.LORAM, value); }
+            get { return _memory.Raw[Memory.POS_PP_BANKSWITCHES].IsBitSet((int)MemoryBankSwitchEnum.LORAM); }
+            set { _memory.Raw[Memory.POS_PP_BANKSWITCHES].SetBit((int)MemoryBankSwitchEnum.LORAM, value); }
         }
     }
 }
