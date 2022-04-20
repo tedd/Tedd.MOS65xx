@@ -7,6 +7,8 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <Image Source="{Binding Bitmap.BitmapSource }" ></Image>
+        <Border BorderBrush="LightBlue" BorderThickness="100">
+        <Image Source="{Binding Bitmap.BitmapSource }" HorizontalAlignment="Stretch"  VerticalAlignment="Stretch"></Image>
+        </Border>
     </Grid>
 </Window>

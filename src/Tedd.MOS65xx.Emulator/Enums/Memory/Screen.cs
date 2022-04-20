@@ -14,4 +14,5 @@ public enum Screen : UInt16
 
     SCREEN_MEMORY_HIGH_BYTE = 0x0288, // High byte of pointer to screen memory for screen input/output.
     DEFAULT_SCREEN_MEMORY = 0x0400, // $0400-$07FF Default screen memory
+    DEFAULT_CHARACTER_MEMORY = 0xD000, // $D000-$D7FF Default character memory
 }

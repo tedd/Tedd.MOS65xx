@@ -7,4 +7,5 @@ public class VICMemory
     {
         _mainMemory = mainMemory;
     }
+
 }

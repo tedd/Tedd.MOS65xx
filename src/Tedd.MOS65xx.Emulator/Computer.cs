@@ -30,7 +30,7 @@ public class Computer
         VICII = new VICII(this);
 
 
-        Run();
+        //Run();
     }
 
 

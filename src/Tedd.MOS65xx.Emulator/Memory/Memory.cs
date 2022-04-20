@@ -187,7 +187,7 @@ public class Memory
                     return CharRom[index - POS_MCBANK6_START];
                 if ((mm & MBM.IO) != 0)
                 {
-                    Trace.WriteLine($"IO-R {0:X2}<-${index}");
+// Trace.WriteLine($"IO-R {0:X2}<-${index}");
                     return 0; // SPECIAL CASE - READING IO
                 }
                 return Raw[index];
