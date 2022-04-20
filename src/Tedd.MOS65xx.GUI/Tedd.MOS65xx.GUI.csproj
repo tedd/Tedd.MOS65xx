@@ -8,10 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Tedd.WriteableBitmap" Version="1.0.3" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\..\..\Tedd.WritableBitmap\src\Tedd.WriteableBitmap\Tedd.WriteableBitmap.csproj" />
     <ProjectReference Include="..\Tedd.MOS65xx.Emulator\Tedd.MOS65xx.Emulator.csproj" />
   </ItemGroup>
 
