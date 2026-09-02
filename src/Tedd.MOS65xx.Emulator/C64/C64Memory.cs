@@ -109,9 +109,10 @@ public sealed class C64Memory : IBus, IVicMemory
     private byte PortLevels()
     {
         // Output bits show the data register; input bits show the external level:
-        // bits 0-2 have pull-ups (read 1), bit 3 (cassette write) reads 0, bit 4 cassette sense,
-        // bit 5 (motor) reads 0, bits 6/7 are not connected and keep the last written value (no decay modelled).
-        int inputs = 0x07 | (CassetteSense ? 0x10 : 0) | (_portDataSetBits & 0xC0);
+        // bits 0-3 have pull-ups (read 1; bit 3 is the cassette write line), bit 4 cassette sense,
+        // bit 5 (motor control) reads 0, bits 6/7 are not connected and keep the last written value (no decay
+        // modelled). Verified with the Lorenz "cpuport" test.
+        int inputs = 0x0F | (CassetteSense ? 0x10 : 0) | (_portDataSetBits & 0xC0);
         return (byte)((_portData & _portDdr) | (inputs & ~_portDdr));
     }
 
