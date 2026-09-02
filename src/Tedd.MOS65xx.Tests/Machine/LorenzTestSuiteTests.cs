@@ -95,6 +95,7 @@ public class LorenzTestSuiteTests
         Assert.That(c64.WaitForBasicReady(400), Is.True, "BASIC did not boot");
 
         var results = new List<Result>();
+        bool needReset = false;
         foreach (var name in names)
         {
             var path = Path.Combine(dir!, name + ".prg");
@@ -103,7 +104,8 @@ public class LorenzTestSuiteTests
                 results.Add(new Result(name, Outcome.Missing, 0, "", null));
                 continue;
             }
-            var result = RunOne(c64, name, File.ReadAllBytes(path));
+            var result = RunOne(c64, name, File.ReadAllBytes(path), needReset);
+            needReset = result.Outcome != Outcome.Passed;
             results.Add(result);
             TestContext.Out.WriteLine($"{result.Outcome,-8} {name,-12} {result.Cycles,12:N0} cycles" +
                                       (result.Outcome == Outcome.Passed ? "" : "\n" + Indent(result.Screen)));
@@ -127,13 +129,16 @@ public class LorenzTestSuiteTests
     /// SYS entry) and runs until it loads the next test (pass), waits
     /// for a key (fail), exits or exhausts its cycle budget.
     /// </summary>
-    private static Result RunOne(C64 c64, string name, byte[] prg)
+    private static Result RunOne(C64 c64, string name, byte[] prg, bool resetFirst)
     {
-        // A failed test leaves the machine in an arbitrary state (own IRQ vectors, CIA setup...), so every
-        // program starts from a freshly power-cycled machine (a soft reset keeps enough state to upset some programs).
-        c64.Reset(hard: true);
-        if (!c64.WaitForBasicReady(400))
-            return new Result(name, Outcome.Failed, 0, "BASIC did not come up after reset: " + c64.GetScreenText(), null);
+        // Like the real chain, programs follow each other without a reset. Only a failed program leaves the
+        // machine in an arbitrary state (own vectors, CIA setup...), so the next one starts from a power cycle.
+        if (resetFirst)
+        {
+            c64.Reset(hard: true);
+            if (!c64.WaitForBasicReady(400))
+                return new Result(name, Outcome.Failed, 0, "BASIC did not come up after reset: " + c64.GetScreenText(), null);
+        }
 
         int load = prg[0] | (prg[1] << 8);
         for (int i = 2; i < prg.Length; i++)

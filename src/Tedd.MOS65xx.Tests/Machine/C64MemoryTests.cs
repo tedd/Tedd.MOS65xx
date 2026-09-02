@@ -102,14 +102,21 @@ public class C64MemoryTests
     }
 
     [Test]
-    public void Port_Bits6And7_KeepWrittenValue()
+    public void Port_Floating_Bits_Keep_Last_Driven_Level()
     {
+        // Lorenz "cpuport": bits 3, 6 and 7 read the level last driven on the pin, not the data register.
         var m = Fresh();
-        m.Write(0, 0x2F);
-        m.Write(1, 0xF7);
-        Assert.That(m.Read(1) & 0xC0, Is.EqualTo(0xC0));
-        m.Write(1, 0x37);
-        Assert.That(m.Read(1) & 0xC0, Is.EqualTo(0x00));
+        m.Write(0, 0xFF);
+        m.Write(1, 0xFF);
+        m.Write(0, 0x00);          // all inputs: floating pins keep 1
+        m.Write(1, 0xFF);
+        Assert.That(m.Read(1), Is.EqualTo(0xDF));
+        m.Write(0, 0xFF);
+        m.Write(1, 0xFF);
+        m.Write(1, 0x00);          // driven low
+        m.Write(0, 0x00);          // inputs again: floating pins keep 0 even when FF is written now
+        m.Write(1, 0xFF);
+        Assert.That(m.Read(1), Is.EqualTo(0x17));
     }
 
     [Test]
