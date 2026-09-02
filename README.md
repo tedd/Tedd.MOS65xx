@@ -40,8 +40,9 @@ at them:
 * `characters.901225-01.bin` (4 KiB) or another `characters*.bin`
 * optional 1541 ROM: `1541-II.251968-03.bin` (16 KiB) or the pair `1541-c000.325302-01.bin` + `1541-e000.901229-05.bin`
 
-The web build can use [OpenROMs](https://github.com/MEGA65/open-roms) (a free GPL re-implementation) and also
-lets you upload your own ROMs, which stay in your browser.
+The web build can use [OpenROMs](https://github.com/MEGA65/open-roms) (a free LGPL re-implementation of
+BASIC/KERNAL/character set, fetched by `tools/fetch-openroms.sh`; no 1541 DOS) and also lets you upload your
+own ROMs, which stay in your browser's local storage.
 
 ## Building and testing
 
@@ -58,7 +59,11 @@ Slow and data-dependent suites:
 * `HARTE_6502_TESTS=<dir>` enables the 2.56 million SingleStepTests vectors (download `6502/v1/*.json` from
   https://github.com/SingleStepTests/65x02).
 * `LORENZ_TESTS=<dir>` enables Wolfgang Lorenz's C64 test-suite (the `*.prg` files from VICE's
-  `testprogs/general/Lorenz-2.15/src`), run with `dotnet test -c Release --filter Category=Lorenz`.
+  `testprogs/general/Lorenz-2.15/src`), run with `dotnet test -c Release --filter Category=Lorenz`
+  (`LORENZ_ONLY=cia1ta,irq` narrows it down). Status: all 200 CPU opcode programs, `trap2`-`trap16`,
+  `branchwrap`, `mmufetch`, `mmu`, `cputiming`, `irq` and every CIA timer program (`cia1ta/tb`, `cia2ta/tb`,
+  `*pb6/7`, `*tb123`, `cia1tab`, `icr01`, `imr`, `flipos`, `oneshot`, `cntdef`, `cnto2`, `loadth`) pass;
+  `nmi` (NMI during BRK) and `trap17` are still open.
 
 Rendering tests write PNG frames to `TestResults/` next to the test assembly.
 

@@ -12,7 +12,7 @@ namespace Tedd.MOS65xx.Tests.Machine;
 /// Runs Wolfgang Lorenz's "C64 Emulator Test Suite" (v2.15, public domain) on the full machine with the real
 /// ROMs. Every test program is a PRG that prints its name, runs, prints " - ok" and then asks the KERNAL to load
 /// the next test; on a failure it prints the details and waits for a key. The harness injects each program
-/// itself, starts it at $0816 like the official "testsuite stub" does, and traps the KERNAL LOAD entry ($E16F)
+/// itself, starts it at the SYS entry ($080E, or $0801 for "start") like the official "testsuite stub" does, and traps the KERNAL LOAD entry ($FFD5)
 /// to detect success and GETIN ($FFE4) to detect failure.
 ///
 /// The PRG files are not part of the repository: point LORENZ_TESTS at a directory with the *.prg files (from
@@ -123,15 +123,15 @@ public class LorenzTestSuiteTests
     private static string Indent(string text) => "    " + text.TrimEnd().Replace("\n", "\n    ");
 
     /// <summary>
-    /// Injects the program like LOAD would, then starts it the way the official stub does (S=$FD, I set, PC=$0816,
-    /// i.e. skipping the BASIC SYS stub and the screen setup) and runs until it loads the next test (pass), waits
+    /// Injects the program like LOAD would, then starts it the way the official stub does (S=$FD, I set, PC at the
+    /// SYS entry) and runs until it loads the next test (pass), waits
     /// for a key (fail), exits or exhausts its cycle budget.
     /// </summary>
     private static Result RunOne(C64 c64, string name, byte[] prg)
     {
         // A failed test leaves the machine in an arbitrary state (own IRQ vectors, CIA setup...), so every
-        // program starts from a freshly reset, ready machine like it would after a chained LOAD on a clean C64.
-        c64.Reset(hard: false);
+        // program starts from a freshly power-cycled machine (a soft reset keeps enough state to upset some programs).
+        c64.Reset(hard: true);
         if (!c64.WaitForBasicReady(400))
             return new Result(name, Outcome.Failed, 0, "BASIC did not come up after reset: " + c64.GetScreenText(), null);
 
