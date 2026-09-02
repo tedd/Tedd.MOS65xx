@@ -10,12 +10,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Tedd.MOS65xx.Emulator\Tedd.MOS65xx.Emulator.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- ROM images and disk/tape images are not committed (see .gitignore) but are copied next to the executable when present. -->
-    <None Update="*.bin;*.D64;*.d64;*.T64;*.t64">
+    <None Update="*.bin;*.D64;*.d64;*.T64;*.t64;*.prg;*.PRG;*.crt;*.CRT">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

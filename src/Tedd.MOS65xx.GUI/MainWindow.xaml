@@ -3,10 +3,70 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:Tedd.MOS65xx.GUI"
         mc:Ignorable="d"
-        Title="Tedd.MOS65xx C64" Height="600" Width="800">
-    <Grid>
-        <Image x:Name="Screen" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-    </Grid>
+        Title="Tedd.MOS65xx - Commodore 64" Height="700" Width="900"
+        Background="#202020" Focusable="True"
+        KeyDown="Window_KeyDown" KeyUp="Window_KeyUp" Closing="Window_Closing" Loaded="Window_Loaded"
+        Deactivated="Window_Deactivated">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="Attach _Disk (D64)..." Click="AttachDisk_Click" InputGestureText="F9" />
+                <MenuItem Header="Attach Disk and _Autostart..." Click="AttachDiskAutostart_Click" />
+                <MenuItem Header="Attach _Tape / Program (T64, PRG)..." Click="AttachTape_Click" InputGestureText="F10" />
+                <MenuItem Header="Attach _Cartridge (BIN, CRT)..." Click="AttachCartridge_Click" />
+                <MenuItem Header="Detach Cartridge" Click="DetachCartridge_Click" />
+                <MenuItem Header="Eject Disk" Click="EjectDisk_Click" />
+                <MenuItem Header="Save Disk Changes..." Click="SaveDisk_Click" />
+                <Separator />
+                <MenuItem Header="Save _Screenshot..." Click="Screenshot_Click" InputGestureText="F12" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="Exit_Click" />
+            </MenuItem>
+            <MenuItem Header="_Machine">
+                <MenuItem Header="_Reset" Click="Reset_Click" InputGestureText="F11" />
+                <MenuItem Header="_Hard Reset (power cycle)" Click="HardReset_Click" />
+                <Separator />
+                <MenuItem x:Name="PauseMenu" Header="_Pause / Freeze" IsCheckable="True" Click="Pause_Click" InputGestureText="Pause" />
+                <MenuItem x:Name="WarpMenu" Header="_Warp Speed" IsCheckable="True" Click="Warp_Click" InputGestureText="Alt+W" />
+                <Separator />
+                <MenuItem x:Name="DriveMenu" Header="1541 Drive (device 8)" IsCheckable="True" Click="Drive_Click" />
+                <MenuItem Header="Joystick on numeric keypad">
+                    <MenuItem x:Name="JoyPort1Menu" Header="Port 1" IsCheckable="True" Click="JoyPort_Click" />
+                    <MenuItem x:Name="JoyPort2Menu" Header="Port 2" IsCheckable="True" IsChecked="True" Click="JoyPort_Click" />
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Memory Viewer / Editor..." Click="MemoryViewer_Click" InputGestureText="Alt+M" />
+                <MenuItem Header="_Type Text..." Click="TypeText_Click" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Keyboard Help" Click="KeyboardHelp_Click" />
+                <MenuItem Header="_About" Click="About_Click" />
+            </MenuItem>
+        </Menu>
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="FpsText" Text="0.0 fps" MinWidth="70" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse x:Name="DriveLed" Width="10" Height="10" Fill="DarkRed" Margin="0,0,4,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="DriveText" Text="No drive" MinWidth="120" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="StateText" Text="Running" MinWidth="80" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="MediaText" Text="" />
+            </StatusBarItem>
+        </StatusBar>
+        <Viewbox Stretch="Uniform">
+            <Image x:Name="Screen" Width="384" Height="272" RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+        </Viewbox>
+    </DockPanel>
 </Window>
