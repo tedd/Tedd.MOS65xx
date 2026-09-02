@@ -22,4 +22,8 @@
     <ProjectReference Include="..\Tedd.MOS65xx.Emulator\Tedd.MOS65xx.Emulator.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
