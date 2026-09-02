@@ -60,10 +60,10 @@ Slow and data-dependent suites:
   https://github.com/SingleStepTests/65x02).
 * `LORENZ_TESTS=<dir>` enables Wolfgang Lorenz's C64 test-suite (the `*.prg` files from VICE's
   `testprogs/general/Lorenz-2.15/src`), run with `dotnet test -c Release --filter Category=Lorenz`
-  (`LORENZ_ONLY=cia1ta,irq` narrows it down). Status: all 200 CPU opcode programs, `trap2`-`trap16`,
-  `branchwrap`, `mmufetch`, `mmu`, `cputiming`, `irq` and every CIA timer program (`cia1ta/tb`, `cia2ta/tb`,
-  `*pb6/7`, `*tb123`, `cia1tab`, `icr01`, `imr`, `flipos`, `oneshot`, `cntdef`, `cnto2`, `loadth`) pass;
-  `nmi` (NMI during BRK) and `trap17` are still open.
+  (`LORENZ_ONLY=cia1ta,irq` narrows it down). Status: all 221 CPU opcode programs, `trap1`-`trap16`,
+  `branchwrap`, `mmufetch`, `mmu`, `cpuport`, `cputiming`, `irq` and every CIA timer program (`cia1ta/tb`,
+  `cia2ta/tb`, `*pb6/7`, `*tb123`, `cia1tab`, `icr01`, `imr`, `flipos`, `oneshot`, `cntdef`, `cnto2`, `loadth`)
+  pass; `nmi` (NMI arriving during BRK) and `trap17` are still open.
 
 Rendering tests write PNG frames to `TestResults/` next to the test assembly.
 
