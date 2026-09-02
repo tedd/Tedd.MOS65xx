@@ -53,6 +53,8 @@ public sealed class DiskUnit
     public int BitPosition => _bitPosition;
     /// <summary>Density selected by the DOS (0 = slowest, 3 = fastest).</summary>
     public int Density => _density;
+    /// <summary>Current stepper motor phase (VIA2 PB0-1).</summary>
+    public int StepperPhase => _stepperPhase;
     /// <summary>True if the disk has been written to since it was inserted or saved.</summary>
     public bool IsDirty => _dirty;
     public GcrDisk? Disk => _disk;
