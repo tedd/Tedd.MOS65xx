@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tedd.MOS65xx.Tests", "Tedd.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tedd.MOS65xx.Hosting", "Tedd.MOS65xx.Hosting\Tedd.MOS65xx.Hosting.csproj", "{CC0170AF-59DA-474C-BA96-8AF4A61A266D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tedd.MOS65xx.Sdl", "Tedd.MOS65xx.Sdl\Tedd.MOS65xx.Sdl.csproj", "{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,18 @@ Global
 		{CC0170AF-59DA-474C-BA96-8AF4A61A266D}.Release|x64.Build.0 = Release|Any CPU
 		{CC0170AF-59DA-474C-BA96-8AF4A61A266D}.Release|x86.ActiveCfg = Release|Any CPU
 		{CC0170AF-59DA-474C-BA96-8AF4A61A266D}.Release|x86.Build.0 = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|x64.Build.0 = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Debug|x86.Build.0 = Debug|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|x64.ActiveCfg = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|x64.Build.0 = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|x86.ActiveCfg = Release|Any CPU
+		{58591D04-C097-413D-AF1D-9EC2BA9C8BB0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
