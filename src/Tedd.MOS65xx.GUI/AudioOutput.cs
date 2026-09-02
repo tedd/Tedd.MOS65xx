@@ -1,4 +1,5 @@
 using System;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace Tedd.MOS65xx.GUI;
@@ -6,18 +7,17 @@ namespace Tedd.MOS65xx.GUI;
 /// <summary>Plays 16-bit mono PCM produced by the SID resampler through the default output device.</summary>
 public sealed class AudioOutput : IDisposable
 {
-    private readonly WaveOutEvent _out;
+    private readonly WasapiOut _out;
     private readonly BufferedWaveProvider _buffer;
     private readonly byte[] _bytes = new byte[16384];
 
     public AudioOutput(int sampleRate)
     {
-        _buffer = new BufferedWaveProvider(new WaveFormat(sampleRate, 16, 1))
+        _buffer = new BufferedWaveProvider(new WaveFormat(sampleRate, 16, 1), TimeSpan.FromMilliseconds(500))
         {
-            BufferDuration = TimeSpan.FromMilliseconds(500),
             DiscardOnBufferOverflow = true,
         };
-        _out = new WaveOutEvent { DesiredLatency = 80, NumberOfBuffers = 4 };
+        _out = new WasapiOut(AudioClientShareMode.Shared, 60);
         _out.Init(_buffer);
         _out.Play();
     }
