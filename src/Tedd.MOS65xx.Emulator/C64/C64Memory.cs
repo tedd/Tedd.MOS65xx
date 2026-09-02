@@ -30,7 +30,7 @@ public sealed class C64Memory : IBus, IVicMemory
     // 6510 on-chip port ($0000 = DDR, $0001 = data)
     private byte _portDdr;
     private byte _portData;
-    private byte _portDataSetBits; // bits 6/7 keep their written value even when configured as input
+    private byte _portFloating;    // bits 3, 6 and 7 float: as inputs they read the level last driven on the pin
 
     /// <summary>Cassette sense input (bit 4): true = no key pressed on the datasette (line high).</summary>
     public bool CassetteSense = true;
@@ -97,7 +97,8 @@ public sealed class C64Memory : IBus, IVicMemory
         // Power-on state of the 6510 port: DDR = $2F (bits 0-3,5 output), data = $37 -> LORAM/HIRAM/CHAREN high.
         _portDdr = 0x2F;
         _portData = 0x37;
-        _portDataSetBits = 0;
+        _portFloating = 0;
+        UpdateFloating();
         VicBank = 0;
         LastBusValue = 0;
         UpdateMap();
@@ -108,12 +109,18 @@ public sealed class C64Memory : IBus, IVicMemory
 
     private byte PortLevels()
     {
-        // Output bits show the data register; input bits show the external level:
-        // bits 0-3 have pull-ups (read 1; bit 3 is the cassette write line), bit 4 cassette sense,
-        // bit 5 (motor control) reads 0, bits 6/7 are not connected and keep the last written value (no decay
+        // Output bits show the data register; input bits show the external level: bits 0-2 have pull-ups
+        // (read 1), bit 4 is the cassette sense line, bit 5 (motor control) reads 0, and bits 3, 6 and 7 are not
+        // driven by anything else, so as inputs they keep the level that was last driven on the pin (no decay
         // modelled). Verified with the Lorenz "cpuport" test.
-        int inputs = 0x0F | (CassetteSense ? 0x10 : 0) | (_portDataSetBits & 0xC0);
+        int inputs = 0x07 | (CassetteSense ? 0x10 : 0) | (_portFloating & 0xC8);
         return (byte)((_portData & _portDdr) | (inputs & ~_portDdr));
+    }
+
+    /// <summary>Pins that are outputs take the data register level; that level stays on the floating pins when they become inputs.</summary>
+    private void UpdateFloating()
+    {
+        _portFloating = (byte)(((_portFloating & ~_portDdr) | (_portData & _portDdr)) & 0xC8);
     }
 
     private void UpdateMap()
@@ -236,13 +243,14 @@ public sealed class C64Memory : IBus, IVicMemory
                 if (address == 0)
                 {
                     _portDdr = value;
+                    UpdateFloating();
                     UpdateMap();
                     return;
                 }
                 if (address == 1)
                 {
                     _portData = value;
-                    _portDataSetBits = (byte)(value & 0xC0);
+                    UpdateFloating();
                     UpdateMap();
                     return;
                 }
