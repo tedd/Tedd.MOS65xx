@@ -290,3 +290,6 @@ __pycache__/
 /src/Tedd.MOS65xx.GUI/*.bin
 /src/Tedd.MOS65xx.GUI/*.[Dd]64
 /src/Tedd.MOS65xx.GUI/*.[Tt]64
+
+# Claude Code worktrees / local state
+.claude/worktrees/
