@@ -1,0 +1,148 @@
+@using Tedd.MOS65xx.Emulator.C64
+@using Tedd.MOS65xx.Hosting
+@implements IDisposable
+
+<div class="emu" id="emu-root">
+
+    <div class="emu-screen" id="emu-screen" tabindex="0" @onclick="FocusScreen" @oncontextmenu:preventDefault>
+        <canvas id="emu-canvas" class="emu-canvas" width="384" height="272" aria-label="Commodore 64 screen"></canvas>
+
+        @if (_state != EmuState.Running)
+        {
+            <div class="emu-overlay">
+                @switch (_state)
+                {
+                    case EmuState.Booting:
+                        <p class="emu-overlay-title">Loading emulator…</p>
+                        <p class="muted">@_bootMessage</p>
+                        break;
+                    case EmuState.NeedRoms:
+                        <p class="emu-overlay-title">No ROM images found</p>
+                        <p>The site has no <code>roms/*.bin</code> and nothing is stored in this browser. Use <em>Load your own ROMs</em> below (OpenROMs or your own dumps).</p>
+                        <button class="btn" @onclick="() => _showRoms = true">Open the ROM panel</button>
+                        break;
+                    case EmuState.Ready:
+                        <button class="btn btn-start" @onclick="StartAsync">&#9654; Start</button>
+                        <p class="muted">@_roms.Description</p>
+                        @if (_roms.LooksLikeOpenRoms)
+                        {
+                            <p class="muted small">Booting with the free OpenROMs. Real Commodore ROMs can be loaded below.</p>
+                        }
+                        break;
+                    case EmuState.Failed:
+                        <p class="emu-overlay-title">Emulator stopped</p>
+                        <pre class="error">@_error</pre>
+                        <button class="btn" @onclick="StartAsync">Restart</button>
+                        break;
+                }
+            </div>
+        }
+        @if (_session?.Machine.Drive is { } drive)
+        {
+            <div class="emu-drive @(drive.Led ? "on" : "")" title="1541 drive LED / track">
+                <span class="led"></span> 8 · T@(drive.Disk.Track.ToString("0.#"))
+            </div>
+        }
+    </div>
+
+    <div class="emu-toolbar">
+        <button class="btn" @onclick="Reset" disabled="@(!IsRunning)" title="Reset (F11)">Reset</button>
+        <button class="btn @(_session?.Paused == true ? "active" : "")" @onclick="TogglePauseAsync" disabled="@(!IsRunning)" title="Pause (Pause key)">@(_session?.Paused == true ? "Resume" : "Pause")</button>
+        <button class="btn @(_session?.Warp == true ? "active" : "")" @onclick="ToggleWarp" disabled="@(!IsRunning)" title="Run as fast as possible, audio off">Warp</button>
+        <button class="btn" @onclick="Screenshot" disabled="@(!IsRunning)" title="Save the screen as PNG (F12)">Screenshot</button>
+        <button class="btn" @onclick="Fullscreen" title="Fullscreen">Fullscreen</button>
+        <span class="spacer"></span>
+        <button class="btn btn-accent" @onclick="RunDemo" disabled="@(!IsRunning)" title="Assemble the built-in tech demo and run it">Run demo</button>
+        <label class="btn btn-file" title="Attach a .d64 / .t64 / .prg / .crt (or drop it on the screen)">
+            Open file… <InputFile OnChange="OnMediaSelected" accept=".d64,.t64,.prg,.p00,.crt,.bin" disabled="@(!IsRunning)" />
+        </label>
+        <button class="btn" @onclick="Eject" disabled="@(!IsRunning || string.IsNullOrEmpty(_session?.MediaDescription))">Eject</button>
+        <label class="chk" title="Type LOAD/RUN automatically after attaching a file"><input type="checkbox" @bind="_autostart" /> autostart</label>
+    </div>
+
+    <div class="emu-status">
+        <span class="stat" title="Emulated frames per second (50.1 = real time) and share of time spent emulating">
+            <b>@_fps.ToString("0.0")</b> fps · @((_load * 100).ToString("0"))% load
+        </span>
+        <span class="stat @(_basicReady ? "ok" : "")" title="BASIC READY. prompt detected"><span class="led"></span> BASIC ready</span>
+        <span class="stat" title="Audio context state">audio: @_audioState</span>
+        <span class="stat media" title="Attached media">@(string.IsNullOrEmpty(_session?.MediaDescription) ? "no media" : _session!.MediaDescription)</span>
+        @if (_session?.Machine.Autostart is C64.AutostartState.WaitingForBasic or C64.AutostartState.Loading or C64.AutostartState.WaitingForRun)
+        {
+            <span class="stat">autostart: @_session.Machine.Autostart</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="emu-message" @onclick="() => _message = null">@_message</div>
+    }
+
+    <details class="panel" open="@_touchDevice">
+        <summary>Touch controls</summary>
+        <div class="touch">
+            <div class="dpad">
+                <button class="tbtn up" @onpointerdown="() => Joy(JoystickInput.Up, true)" @onpointerup="() => Joy(JoystickInput.Up, false)" @onpointercancel="() => Joy(JoystickInput.Up, false)" @onpointerleave="() => Joy(JoystickInput.Up, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>&#9650;</button>
+                <button class="tbtn left" @onpointerdown="() => Joy(JoystickInput.Left, true)" @onpointerup="() => Joy(JoystickInput.Left, false)" @onpointercancel="() => Joy(JoystickInput.Left, false)" @onpointerleave="() => Joy(JoystickInput.Left, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>&#9664;</button>
+                <button class="tbtn right" @onpointerdown="() => Joy(JoystickInput.Right, true)" @onpointerup="() => Joy(JoystickInput.Right, false)" @onpointercancel="() => Joy(JoystickInput.Right, false)" @onpointerleave="() => Joy(JoystickInput.Right, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>&#9654;</button>
+                <button class="tbtn down" @onpointerdown="() => Joy(JoystickInput.Down, true)" @onpointerup="() => Joy(JoystickInput.Down, false)" @onpointercancel="() => Joy(JoystickInput.Down, false)" @onpointerleave="() => Joy(JoystickInput.Down, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>&#9660;</button>
+            </div>
+            <button class="tbtn fire" @onpointerdown="() => Joy(JoystickInput.Fire, true)" @onpointerup="() => Joy(JoystickInput.Fire, false)" @onpointercancel="() => Joy(JoystickInput.Fire, false)" @onpointerleave="() => Joy(JoystickInput.Fire, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>FIRE</button>
+            <div class="softkeys">
+                <label class="chk">port <select @bind="_joyPort"><option value="1">1</option><option value="2">2</option></select></label>
+                @foreach (var (label, key) in SoftKeys)
+                {
+                    <button class="tbtn key" @onpointerdown="() => Key(key, true)" @onpointerup="() => Key(key, false)" @onpointercancel="() => Key(key, false)" @onpointerleave="() => Key(key, false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>@label</button>
+                }
+                <button class="tbtn key" @onpointerdown="() => Restore(true)" @onpointerup="() => Restore(false)" @onpointercancel="() => Restore(false)" @onpointerdown:preventDefault @oncontextmenu:preventDefault>RESTORE</button>
+            </div>
+        </div>
+    </details>
+
+    <details class="panel" open>
+        <summary>Type text</summary>
+        <div class="typebox">
+            <textarea @bind="_typeText" rows="2" placeholder='e.g. 10 PRINT"HELLO";:GOTO10' spellcheck="false"></textarea>
+            <div class="col">
+                <button class="btn" @onclick="TypeText" disabled="@(!IsRunning || string.IsNullOrEmpty(_typeText))">Type</button>
+                <label class="chk"><input type="checkbox" @bind="_typeReturn" /> + RETURN</label>
+            </div>
+        </div>
+    </details>
+
+    <details class="panel" open="@_showRoms">
+        <summary>Load your own ROMs</summary>
+        <div class="roms">
+            <p>
+                Current set: <code>@_roms.Description</code>
+                @if (_roms.LooksLikeOpenRoms)
+                {
+                    <span> — these are <a href="https://github.com/MEGA65/open-roms" target="_blank" rel="noopener">OpenROMs</a>, a free (LGPL-3.0) re-implementation of BASIC, KERNAL and the character set.
+                    They boot and run machine code perfectly, but the BASIC/KERNAL are not byte-compatible with Commodore's, so software that calls into ROM routines or depends on their timing may misbehave; there is no 1541 DOS either. Load the original images below for full compatibility.</span>
+                }
+            </p>
+            <div class="romgrid">
+                <label>BASIC (8192 bytes) <InputFile OnChange="e => OnRomSelected(e, RomSlot.Basic)" accept=".bin,.rom" /> <span class="muted">@_roms.BasicName</span></label>
+                <label>KERNAL (8192 bytes) <InputFile OnChange="e => OnRomSelected(e, RomSlot.Kernal)" accept=".bin,.rom" /> <span class="muted">@_roms.KernalName</span></label>
+                <label>Character generator (4096 bytes) <InputFile OnChange="e => OnRomSelected(e, RomSlot.Chargen)" accept=".bin,.rom" /> <span class="muted">@_roms.ChargenName</span></label>
+                <label>1541 DOS (16384 bytes, or the two 8192 byte halves, optional) <InputFile OnChange="e => OnRomSelected(e, RomSlot.Drive)" accept=".bin,.rom" multiple /> <span class="muted">@(_roms.DriveHalfPending ? "waiting for the other half…" : _roms.DriveName)</span></label>
+                <label>Combined BASIC+KERNAL (16384 bytes, e.g. 64c.251913-01.bin) <InputFile OnChange="e => OnRomSelected(e, RomSlot.Combined)" accept=".bin,.rom" /></label>
+            </div>
+            <div class="row">
+                <label class="chk"><input type="checkbox" @bind="_rememberRoms" /> remember in this browser (localStorage)</label>
+                <label class="chk"><input type="checkbox" @bind="_attachDrive" disabled="@(!_roms.HasDrive)" /> emulate the 1541 drive (needs the DOS ROM, costs CPU)</label>
+                <button class="btn btn-accent" @onclick="ApplyRomsAsync" disabled="@(!_roms.IsComplete)">Apply &amp; reset</button>
+                <button class="btn" @onclick="ForgetRomsAsync">Forget stored ROMs</button>
+            </div>
+            @if (!string.IsNullOrEmpty(_romMessage))
+            {
+                <p class="error">@_romMessage</p>
+            }
+            <p class="muted small">
+                ROM images never leave your browser. The originals (<code>basic.901226-01.bin</code>, <code>kernal.901227-03.bin</code>,
+                <code>characters.901225-01.bin</code>, <code>1541-II.251968-03.bin</code> …) are copyrighted and not distributed with this site;
+                OpenROMs is used by default. See the <a href="#roms-help">ROM notes</a>.
+            </p>
+        </div>
+    </details>
+</div>

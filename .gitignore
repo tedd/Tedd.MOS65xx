@@ -298,3 +298,6 @@ __pycache__/
 /unity/com.tedd.mos65xx/Runtime/Plugins/*.dll
 /unity/com.tedd.mos65xx/Runtime/Plugins/*.pdb
 /unity/com.tedd.mos65xx/Runtime/Plugins/*.xml
+# Blazor front-end: ROM images (OpenROMs via tools/fetch-openroms.*, or real ROMs) are never committed
+/src/Tedd.MOS65xx.Web/wwwroot/roms/*.bin
+/src/Tedd.MOS65xx.Web/wwwroot/roms/*.rom
