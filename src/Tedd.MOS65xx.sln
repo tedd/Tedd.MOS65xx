@@ -9,8 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tedd.MOS65xx.GUI", "Tedd.MO
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tedd.MOS65xx.Tests", "Tedd.MOS65xx.Tests\Tedd.MOS65xx.Tests.csproj", "{90026E06-CA4C-45B1-9215-9F14025071F4}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tedd.WriteableBitmap", "..\..\Tedd.WritableBitmap\src\Tedd.WriteableBitmap\Tedd.WriteableBitmap.csproj", "{66455112-A311-4B06-9FF5-EDEE63460897}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -29,10 +27,6 @@ Global
 		{90026E06-CA4C-45B1-9215-9F14025071F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{90026E06-CA4C-45B1-9215-9F14025071F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{90026E06-CA4C-45B1-9215-9F14025071F4}.Release|Any CPU.Build.0 = Release|Any CPU
-		{66455112-A311-4B06-9FF5-EDEE63460897}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{66455112-A311-4B06-9FF5-EDEE63460897}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{66455112-A311-4B06-9FF5-EDEE63460897}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{66455112-A311-4B06-9FF5-EDEE63460897}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

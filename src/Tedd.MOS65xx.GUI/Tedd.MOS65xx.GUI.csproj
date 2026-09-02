@@ -1,25 +1,21 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Tedd.MOS65xx.GUI</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Tedd.WritableBitmap\src\Tedd.WriteableBitmap\Tedd.WriteableBitmap.csproj" />
     <ProjectReference Include="..\Tedd.MOS65xx.Emulator\Tedd.MOS65xx.Emulator.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="basic.901226-01.bin">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="characters.901225-01.bin">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="kernal.901227-03.bin">
+    <!-- ROM images and disk/tape images are not committed (see .gitignore) but are copied next to the executable when present. -->
+    <None Update="*.bin;*.D64;*.d64;*.T64;*.t64">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
