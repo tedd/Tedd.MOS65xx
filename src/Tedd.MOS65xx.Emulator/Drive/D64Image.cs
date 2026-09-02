@@ -202,7 +202,7 @@ public sealed class D64Image
     /// <summary>Parses a complete D64 file (one of the four supported sizes). The bytes are copied.</summary>
     public D64Image(byte[] bytes)
     {
-        ArgumentNullException.ThrowIfNull(bytes);
+        if (bytes is null) throw new ArgumentNullException(nameof(bytes));
         bool hasErrors;
         switch (bytes.Length)
         {
@@ -233,7 +233,7 @@ public sealed class D64Image
     /// <summary>Wraps existing sector data (683 or 768 sectors) and an optional error block without copying.</summary>
     public static D64Image FromSectors(byte[] sectorData, byte[]? errorBytes = null)
     {
-        ArgumentNullException.ThrowIfNull(sectorData);
+        if (sectorData is null) throw new ArgumentNullException(nameof(sectorData));
         int trackCount = sectorData.Length switch
         {
             Size35Tracks => 35,
@@ -508,7 +508,7 @@ public sealed class D64Image
     /// <summary>Reads the data of a file by following its sector chain from <see cref="D64DirectoryEntry.Track"/>/<see cref="D64DirectoryEntry.Sector"/>.</summary>
     public byte[] ReadFile(D64DirectoryEntry entry)
     {
-        ArgumentNullException.ThrowIfNull(entry);
+        if (entry is null) throw new ArgumentNullException(nameof(entry));
         if (entry.Track == 0)
             return Array.Empty<byte>();
         return ReadChain(entry.Track, entry.Sector);
@@ -648,7 +648,7 @@ public sealed class D64Image
     /// <summary>Converts text to a fixed-length PETSCII field, truncating or padding with <paramref name="padding"/> ($A0 by default).</summary>
     public static byte[] AsciiToPetscii(string text, int length, byte padding = Padding)
     {
-        ArgumentNullException.ThrowIfNull(text);
+        if (text is null) throw new ArgumentNullException(nameof(text));
         var result = new byte[length];
         Array.Fill(result, padding);
         int n = Math.Min(length, text.Length);

@@ -293,3 +293,8 @@ __pycache__/
 
 # Claude Code worktrees / local state
 .claude/worktrees/
+
+# Unity package: the plugin DLLs are produced by tools/build-unity-package.ps1 / .sh and never committed
+/unity/com.tedd.mos65xx/Runtime/Plugins/*.dll
+/unity/com.tedd.mos65xx/Runtime/Plugins/*.pdb
+/unity/com.tedd.mos65xx/Runtime/Plugins/*.xml

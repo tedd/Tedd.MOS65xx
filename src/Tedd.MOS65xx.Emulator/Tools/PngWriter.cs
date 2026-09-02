@@ -6,7 +6,7 @@ namespace Tedd.MOS65xx.Emulator.Tools;
 
 /// <summary>
 /// Minimal PNG encoder (8 bit RGB, no alpha, no interlacing) with no dependencies beyond
-/// <see cref="ZLibStream"/>. Used by the tests to dump VIC-II frames and by the GUI screenshot feature.
+/// <see cref="DeflateStream"/>. Used by the tests to dump VIC-II frames and by the GUI screenshot feature.
 /// Format per the PNG specification (ISO/IEC 15948): signature, IHDR, IDAT (zlib compressed scanlines, each
 /// prefixed with filter type 0 = None), IEND. Every chunk carries a CRC-32 over its type and data.
 /// </summary>
@@ -63,13 +63,7 @@ public static class PngWriter
             }
         }
 
-        byte[] compressed;
-        using (var ms = new MemoryStream())
-        {
-            using (var z = new ZLibStream(ms, CompressionLevel.Optimal, leaveOpen: true))
-                z.Write(raw, 0, raw.Length);
-            compressed = ms.ToArray();
-        }
+        byte[] compressed = ZlibCompress(raw);
 
         using var output = new MemoryStream(8 + 25 + 12 + compressed.Length + 12);
         output.Write(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
@@ -114,6 +108,46 @@ public static class PngWriter
         Span<byte> crc = stackalloc byte[4];
         WriteBigEndian(crc, 0, Crc32(typeAndData));
         s.Write(crc);
+    }
+
+    /// <summary>
+    /// zlib (RFC 1950) framing around a raw deflate stream: 2-byte header (CM=8 deflate, CINFO=7 32K window,
+    /// FLEVEL=2 default, FCHECK making the header a multiple of 31: 0x78 0x9C), the deflate data, then the
+    /// big-endian Adler-32 of the uncompressed input. Done by hand because <c>ZLibStream</c> is not part of
+    /// netstandard2.1 (Unity); <see cref="DeflateStream"/> is.
+    /// </summary>
+    private static byte[] ZlibCompress(byte[] raw)
+    {
+        using var ms = new MemoryStream(raw.Length / 2 + 64);
+        ms.WriteByte(0x78);
+        ms.WriteByte(0x9C);
+        using (var z = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+            z.Write(raw, 0, raw.Length);
+        Span<byte> adler = stackalloc byte[4];
+        WriteBigEndian(adler, 0, Adler32(raw));
+        ms.Write(adler);
+        return ms.ToArray();
+    }
+
+    /// <summary>Adler-32 checksum (RFC 1950) of <paramref name="data"/>.</summary>
+    public static uint Adler32(ReadOnlySpan<byte> data)
+    {
+        const uint Mod = 65521;
+        uint a = 1, b = 0;
+        int i = 0;
+        while (i < data.Length)
+        {
+            // 5552 is the largest n such that 255n(n+1)/2 + (n+1)(65520) fits in 32 bits (zlib's NMAX).
+            int end = Math.Min(data.Length, i + 5552);
+            for (; i < end; i++)
+            {
+                a += data[i];
+                b += a;
+            }
+            a %= Mod;
+            b %= Mod;
+        }
+        return (b << 16) | a;
     }
 
     private static void WriteBigEndian(Span<byte> buffer, int offset, uint value)

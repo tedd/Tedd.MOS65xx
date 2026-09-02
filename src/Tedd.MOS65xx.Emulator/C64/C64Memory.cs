@@ -90,7 +90,7 @@ public sealed class C64Memory : IBus, IVicMemory
         {
             for (int i = 0; i < Ram.Length; i++)
                 Ram[i] = ((i >> 6) & 1) != 0 ? (byte)0xFF : (byte)0x00;
-            Array.Clear(ColorRam);
+            Array.Clear(ColorRam, 0, ColorRam.Length);
             for (int i = 0; i < ColorRam.Length; i++)
                 ColorRam[i] = (byte)(((i >> 6) & 1) != 0 ? 0x0F : 0x00);
         }
