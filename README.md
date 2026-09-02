@@ -3,7 +3,7 @@
 A cycle-exact Commodore 64 emulator written in C# (.NET 11), with a real 1541 disk drive emulation and several
 front-ends: a Windows desktop app (WPF), a browser build (Blazor WebAssembly), an SDL2 app and a Unity package.
 
-Live demo and downloads: https://tedd.github.io/Tedd.MOS65xx/ (published from the `deploy` branch, see below).
+Live demo and downloads: https://tedd.no/Tedd.MOS65xx/ (GitHub Pages, also reachable as https://tedd.github.io/Tedd.MOS65xx/; published from the `deploy` branch, see below). Binaries: https://github.com/tedd/Tedd.MOS65xx/releases/latest
 
 ## What is emulated
 
