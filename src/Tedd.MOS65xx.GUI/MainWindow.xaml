@@ -19,25 +19,26 @@
                 <MenuItem Header="Eject Disk" Click="EjectDisk_Click" />
                 <MenuItem Header="Save Disk Changes..." Click="SaveDisk_Click" />
                 <Separator />
-                <MenuItem Header="Save _Screenshot..." Click="Screenshot_Click" InputGestureText="F12" />
+                <MenuItem x:Name="ScreenshotMenu" Header="Save _Screenshot..." Click="Screenshot_Click" InputGestureText="F12" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="_Machine">
-                <MenuItem Header="_Reset" Click="Reset_Click" InputGestureText="F11" />
-                <MenuItem Header="_Hard Reset (power cycle)" Click="HardReset_Click" />
+                <MenuItem x:Name="ResetMenu" Header="_Reset" Click="Reset_Click" InputGestureText="F11" />
+                <MenuItem x:Name="HardResetMenu" Header="_Hard Reset (power cycle)" Click="HardReset_Click" />
                 <Separator />
                 <MenuItem x:Name="PauseMenu" Header="_Pause / Freeze" IsCheckable="True" Click="Pause_Click" InputGestureText="Pause" />
                 <MenuItem x:Name="WarpMenu" Header="_Warp Speed" IsCheckable="True" Click="Warp_Click" InputGestureText="Alt+W" />
                 <Separator />
                 <MenuItem x:Name="DriveMenu" Header="1541 Drive (device 8)" IsCheckable="True" Click="Drive_Click" />
-                <MenuItem Header="Joystick on numeric keypad">
-                    <MenuItem x:Name="JoyPort1Menu" Header="Port 1" IsCheckable="True" Click="JoyPort_Click" />
-                    <MenuItem x:Name="JoyPort2Menu" Header="Port 2" IsCheckable="True" IsChecked="True" Click="JoyPort_Click" />
-                </MenuItem>
+                <MenuItem Header="Swap _Joystick Ports" Click="SwapJoystickPorts_Click"
+                          ToolTip="Exchanges every joystick 1 and joystick 2 key binding" />
             </MenuItem>
             <MenuItem Header="_Tools">
-                <MenuItem Header="_Memory Viewer / Editor..." Click="MemoryViewer_Click" InputGestureText="Alt+M" />
+                <MenuItem x:Name="MemoryViewerMenu" Header="_Memory Viewer / Editor..." Click="MemoryViewer_Click" InputGestureText="Alt+M" />
+                <MenuItem Header="_Key Bindings..." Click="KeyBindings_Click" />
+                <MenuItem Header="_Audio Visualizer..." Click="AudioVisualizer_Click" />
+                <Separator />
                 <MenuItem Header="_Type Text..." Click="TypeText_Click" />
             </MenuItem>
             <MenuItem Header="_Help">

@@ -10,18 +10,19 @@ using System.Windows.Threading;
 using Tedd.MOS65xx.Emulator.C64;
 using Tedd.MOS65xx.Emulator.Cpu;
 using Tedd.MOS65xx.Emulator.Media;
+using Tedd.MOS65xx.Hosting;
 
 namespace Tedd.MOS65xx.GUI;
 
 /// <summary>
-/// Hex viewer/editor for the C64 (and 1541) memory. Editing is done through the emulator host so that the
+/// Hex viewer/editor for the C64 (and 1541) memory. Editing is done through the emulator runner so that the
 /// machine is never touched from the UI thread while it is running; "Freeze" stops the machine so values are
 /// stable and single stepping is possible.
 /// </summary>
 public partial class MemoryViewerWindow : Window
 {
-    private readonly EmulatorHost _host;
-    private readonly MenuItem _pauseMenu;
+    private readonly EmulatorRunner _runner;
+    private readonly Action<bool> _setPaused;
     private readonly ObservableCollection<Row> _rows = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(300) };
     private MemorySource _source = MemorySource.Cpu;
@@ -30,34 +31,35 @@ public partial class MemoryViewerWindow : Window
 
     private enum MemorySource { Cpu, Ram, ColorRam, Vic, DriveRam, DriveCpu }
 
-    public MemoryViewerWindow(EmulatorHost host, MenuItem pauseMenu)
+    /// <param name="runner">The runner that owns the machine.</param>
+    /// <param name="setPaused">Freezes/resumes the machine and keeps the main window's menu in sync.</param>
+    public MemoryViewerWindow(EmulatorRunner runner, Action<bool> setPaused)
     {
         InitializeComponent();
-        _host = host;
-        _pauseMenu = pauseMenu;
+        _runner = runner;
+        _setPaused = setPaused;
         Grid.ItemsSource = _rows;
         BuildRows();
         Refresh();
-        _timer.Tick += (_, _) => { if (AutoRefresh.IsChecked == true && !_host.Paused) Refresh(); };
+        _timer.Tick += (_, _) => { if (AutoRefresh.IsChecked == true && !_runner.Paused) Refresh(); };
         _timer.Start();
         OnFreezeChanged();
     }
 
-    private C64 Machine => _host.Machine;
+    private C64 Machine => _runner.Session.Machine;
 
     /// <summary>Called by the main window when the pause state changes elsewhere.</summary>
     public void OnFreezeChanged()
     {
-        FreezeButton.IsChecked = _host.Paused;
-        FreezeButton.Content = _host.Paused ? "Resume" : "Freeze";
-        StepCycleButton.IsEnabled = StepInstructionButton.IsEnabled = StepFrameButton.IsEnabled = _host.Paused;
+        FreezeButton.IsChecked = _runner.Paused;
+        FreezeButton.Content = _runner.Paused ? "Resume" : "Freeze";
+        StepCycleButton.IsEnabled = StepInstructionButton.IsEnabled = StepFrameButton.IsEnabled = _runner.Paused;
         Refresh();
     }
 
     private void Freeze_Click(object sender, RoutedEventArgs e)
     {
-        _host.Paused = FreezeButton.IsChecked == true;
-        _pauseMenu.IsChecked = _host.Paused;
+        _setPaused(FreezeButton.IsChecked == true);
         OnFreezeChanged();
     }
 
@@ -92,7 +94,7 @@ public partial class MemoryViewerWindow : Window
         {
             var data = new byte[_size];
             string registers = "", disassembly = "", machine = "";
-            _host.Invoke(() =>
+            _runner.Invoke(() =>
             {
                 ReadAll(data);
                 registers = FormatRegisters();
@@ -140,7 +142,7 @@ public partial class MemoryViewerWindow : Window
 
     private void WriteByte(int address, byte value)
     {
-        _host.Invoke(() =>
+        _runner.Invoke(() =>
         {
             var m = Machine;
             switch (_source)
@@ -246,19 +248,20 @@ public partial class MemoryViewerWindow : Window
 
     private void StepCycle_Click(object sender, RoutedEventArgs e)
     {
-        _host.Invoke(() => Machine.Clock());
+        _runner.Invoke(_runner.Session.StepCycle);
         Refresh();
     }
 
     private void StepInstruction_Click(object sender, RoutedEventArgs e)
     {
-        _host.Invoke(() => Machine.StepInstruction());
+        _runner.Invoke(_runner.Session.StepInstruction);
         Refresh();
     }
 
     private void StepFrame_Click(object sender, RoutedEventArgs e)
     {
-        _host.Invoke(() => Machine.RunFrame());
+        // Session.RunFrame also presents the frame, so the screen follows the stepping.
+        _runner.Invoke(_runner.Session.RunFrame);
         Refresh();
     }
 

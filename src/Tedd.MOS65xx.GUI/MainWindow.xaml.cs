@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -8,28 +10,35 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Tedd.MOS65xx.Emulator.C64;
-using Tedd.MOS65xx.Emulator.Drive;
 using Tedd.MOS65xx.Emulator.Media;
 using Tedd.MOS65xx.Emulator.Tools;
-using Tedd.MOS65xx.Emulator.Video;
+using Tedd.MOS65xx.Hosting;
 
 namespace Tedd.MOS65xx.GUI;
 
+/// <summary>
+/// The emulator window. The machine lives in an <see cref="EmulatorSession"/> driven by an
+/// <see cref="EmulatorRunner"/> thread; everything that touches it from the UI thread goes through
+/// <see cref="EmulatorRunner.Invoke(Action)"/>. Key events are translated to W3C codes and fed to the session,
+/// which applies the user's <see cref="KeyBindings"/>.
+/// </summary>
 public partial class MainWindow : Window
 {
-    private EmulatorHost? _host;
-    private C64? _c64;
+    /// <summary>Where the key bindings are persisted (%AppData%\Tedd.MOS65xx\keybindings.json).</summary>
+    public static readonly string BindingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Tedd.MOS65xx", "keybindings.json");
+
+    private EmulatorSession? _session;
+    private EmulatorRunner? _runner;
+    private WpfVideoSink? _videoSink;
+    private AudioOutput? _audioOutput;
+    private AudioTap? _audioTap;
     private WriteableBitmap? _bitmap;
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
-    private readonly Dictionary<Key, List<C64Key>> _heldKeys = new();
     private MemoryViewerWindow? _memoryViewer;
+    private AudioVisualizerWindow? _audioVisualizer;
     private string? _diskPath;
-    private volatile bool _frameDirty;
-    private uint[]? _latestFrame;
-    private readonly object _frameLock = new();
-    private bool _joystickPort2 = true;
-
-    private static readonly (int X, int Y, int Width, int Height) Visible = VicII.VisibleArea;
+    private string _romDescription = "";
 
     public MainWindow()
     {
@@ -49,75 +58,57 @@ public partial class MainWindow : Window
             return;
         }
 
-        _c64 = new C64(roms);
-        _bitmap = new WriteableBitmap(Visible.Width, Visible.Height, 96, 96, PixelFormats.Bgra32, null);
+        var bindings = KeyBindings.LoadOrDefault(BindingsPath);
+        var session = new EmulatorSession(roms, sampleRate: 44100, attachDrive: true, bindings: bindings);
+        _session = session;
+
+        _videoSink = new WpfVideoSink();
+        _bitmap = _videoSink.CreateBitmap();
         Screen.Source = _bitmap;
-        Screen.Width = Visible.Width;
-        Screen.Height = Visible.Height;
+        Screen.Width = _videoSink.Width;
+        Screen.Height = _videoSink.Height;
+        session.Video = _videoSink;
 
-        if (roms.Drive1541 is not null)
+        try
         {
-            _c64.AttachDrive(8);
-            DriveMenu.IsChecked = true;
+            _audioOutput = new AudioOutput(session.SampleRate);
         }
-        else
+        catch (Exception ex)
         {
-            DriveMenu.IsEnabled = false;
+            Debug.WriteLine("Audio disabled: " + ex.Message);
         }
+        _audioTap = new AudioTap(_audioOutput, session.SampleRate);
+        session.Audio = _audioTap;
 
-        _host = new EmulatorHost(_c64, enableAudio: true);
-        _host.FrameRendered += OnFrameRendered;
+        session.Command += OnSessionCommand;
+        session.Bindings.Changed += OnBindingsChanged;
+
+        _runner = new EmulatorRunner(session);
+        DriveMenu.IsEnabled = roms.Drive1541 is not null;
+        DriveMenu.IsChecked = session.Machine.Drive is not null;
+        _romDescription = roms.Description;
+        MediaText.Text = _romDescription;
+        UpdateMenuGestures();
+
         CompositionTarget.Rendering += OnRendering;
         _statusTimer.Tick += (_, _) => UpdateStatus();
         _statusTimer.Start();
-        _host.Start();
-        MediaText.Text = roms.Description;
+        _runner.Start();
         Focus();
-    }
-
-    private void OnFrameRendered(uint[] frame)
-    {
-        lock (_frameLock)
-        {
-            _latestFrame = frame;
-            _frameDirty = true;
-        }
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (!_frameDirty || _bitmap is null) return;
-        uint[]? frame;
-        lock (_frameLock)
-        {
-            frame = _latestFrame;
-            _frameDirty = false;
-        }
-        if (frame is null) return;
-        _bitmap.Lock();
-        try
-        {
-            int stride = _bitmap.BackBufferStride;
-            var buffer = _bitmap.BackBuffer;
-            for (int y = 0; y < Visible.Height; y++)
-            {
-                int srcRow = (Visible.Y + y) * VicII.FrameWidth + Visible.X;
-                System.Runtime.InteropServices.Marshal.Copy((int[])(object)frame, srcRow, buffer + y * stride, Visible.Width);
-            }
-            _bitmap.AddDirtyRect(new Int32Rect(0, 0, Visible.Width, Visible.Height));
-        }
-        finally
-        {
-            _bitmap.Unlock();
-        }
+        if (_bitmap is not null)
+            _videoSink?.Blit(_bitmap);
     }
 
     private void UpdateStatus()
     {
-        if (_host is null || _c64 is null) return;
-        FpsText.Text = $"{_host.MeasuredFps:0.0} fps";
-        StateText.Text = _host.Paused ? "Frozen" : _host.Warp ? "Warp" : "Running";
-        var drive = _c64.Drive;
+        if (_runner is null || _session is null) return;
+        FpsText.Text = $"{_runner.MeasuredFps:0.0} fps";
+        StateText.Text = _runner.Paused ? "Frozen" : _runner.Warp ? "Warp" : "Running";
+        var drive = _session.Machine.Drive;
         if (drive is null)
         {
             DriveLed.Fill = Brushes.DimGray;
@@ -129,105 +120,136 @@ public partial class MainWindow : Window
             string disk = drive.Disk.Disk is null ? "no disk" : Path.GetFileName(_diskPath ?? "disk");
             DriveText.Text = $"8: {disk}  T{drive.Disk.Track:0.#}{(drive.MotorOn ? " *" : "")}";
         }
+        string media = _session.MediaDescription;
+        MediaText.Text = media.Length == 0 ? _romDescription : media;
     }
+
+    #region Session commands and bindings
+
+    /// <summary>Raised by the session when a key bound to a host command is pressed (may be on any thread).</summary>
+    private void OnSessionCommand(SystemCommand command) => Dispatcher.InvokeAsync(() => HandleCommand(command));
+
+    private void HandleCommand(SystemCommand command)
+    {
+        if (_runner is null) return;
+        switch (command)
+        {
+            case SystemCommand.Reset: DoReset(hard: false); break;
+            case SystemCommand.HardReset: DoReset(hard: true); break;
+            case SystemCommand.Pause: SetPaused(!_runner.Paused); break;
+            case SystemCommand.Warp: SetWarp(!_runner.Warp); break;
+            case SystemCommand.Screenshot: SaveScreenshot(); break;
+            case SystemCommand.MemoryViewer: ShowMemoryViewer(); break;
+        }
+    }
+
+    private void OnBindingsChanged()
+    {
+        if (Dispatcher.CheckAccess()) UpdateMenuGestures();
+        else Dispatcher.InvokeAsync(UpdateMenuGestures);
+    }
+
+    /// <summary>Shows the key bound to each host command next to its menu item.</summary>
+    private void UpdateMenuGestures()
+    {
+        if (_session is null) return;
+        var b = _session.Bindings;
+        string Gesture(SystemCommand cmd, string fallback)
+        {
+            var code = b.CodesFor(InputAction.ForSystem(cmd)).FirstOrDefault();
+            return code is null ? fallback : KeyCodes.Display(code);
+        }
+        ResetMenu.InputGestureText = Gesture(SystemCommand.Reset, "");
+        HardResetMenu.InputGestureText = Gesture(SystemCommand.HardReset, "");
+        PauseMenu.InputGestureText = Gesture(SystemCommand.Pause, "");
+        WarpMenu.InputGestureText = Gesture(SystemCommand.Warp, "Alt+W");
+        ScreenshotMenu.InputGestureText = Gesture(SystemCommand.Screenshot, "");
+        MemoryViewerMenu.InputGestureText = Gesture(SystemCommand.MemoryViewer, "Alt+M");
+    }
+
+    private void SetPaused(bool paused)
+    {
+        if (_runner is null) return;
+        _runner.Paused = paused;
+        PauseMenu.IsChecked = paused;
+        _memoryViewer?.OnFreezeChanged();
+    }
+
+    private void SetWarp(bool warp)
+    {
+        if (_runner is null) return;
+        _runner.Warp = warp;
+        WarpMenu.IsChecked = warp;
+    }
+
+    private void DoReset(bool hard)
+    {
+        if (_runner is null || _session is null) return;
+        var session = _session;
+        _runner.Invoke(() => session.Reset(hard));
+    }
+
+    private void TrySaveBindings()
+    {
+        try
+        {
+            _session?.Bindings.Save(BindingsPath);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Cannot save key bindings", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    #endregion
 
     #region Keyboard / joystick
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (_c64 is null) return;
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (_session is null || _runner is null) return;
+        var key = WpfKeyCodes.ResolveKey(e);
         if (e.IsRepeat) { e.Handled = true; return; }
 
-        if (System.Windows.Input.Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+        bool alt = e.KeyboardDevice.Modifiers.HasFlag(ModifierKeys.Alt);
+        if (alt)
         {
             switch (key)
             {
-                case Key.W: WarpMenu.IsChecked = !WarpMenu.IsChecked; Warp_Click(this, e); e.Handled = true; return;
-                case Key.M: MemoryViewer_Click(this, e); e.Handled = true; return;
+                case Key.W: SetWarp(!_runner.Warp); e.Handled = true; return;
+                case Key.M: ShowMemoryViewer(); e.Handled = true; return;
+                case Key.F4: return; // let WPF close the window
             }
         }
         switch (key)
         {
-            case Key.F9: AttachDisk_Click(this, e); e.Handled = true; return;
-            case Key.F10: AttachTape_Click(this, e); e.Handled = true; return;
-            case Key.F11: Reset_Click(this, e); e.Handled = true; return;
-            case Key.F12: Screenshot_Click(this, e); e.Handled = true; return;
-            case Key.Pause: PauseMenu.IsChecked = !PauseMenu.IsChecked; Pause_Click(this, e); e.Handled = true; return;
+            case Key.F9: AttachDisk(autostart: false); e.Handled = true; return;
+            case Key.F10: AttachTape(); e.Handled = true; return;
         }
 
-        if (KeyMapper.TryMapJoystick(key, out bool up, out bool down, out bool left, out bool right, out bool fire))
-        {
-            var j = _joystickPort2 ? _c64.Joystick2 : _c64.Joystick1;
-            if (up) j.Up = true;
-            if (down) j.Down = true;
-            if (left) j.Left = true;
-            if (right) j.Right = true;
-            if (fire) j.Fire = true;
-            e.Handled = true;
-            return;
-        }
-        if (KeyMapper.IsRestore(key))
-        {
-            _c64.Keyboard.SetRestore(true);
-            e.Handled = true;
-            return;
-        }
-        if (KeyMapper.TryMap(key, out var m) && !_heldKeys.ContainsKey(key))
-        {
-            var list = new List<C64Key> { m.Key };
-            if (m.Shift) list.Add(C64Key.LeftShift);
-            foreach (var k in list) _c64.Keyboard.Press(k);
-            _heldKeys[key] = list;
-            e.Handled = true;
-        }
+        if (!WpfKeyCodes.TryGetCode(key, out var code)) return;
+        if (!_session.Bindings.TryGet(code, out _)) return;
+        var session = _session;
+        _runner.Invoke(() => session.KeyDown(code));
+        e.Handled = true;
     }
 
     private void Window_KeyUp(object sender, KeyEventArgs e)
     {
-        if (_c64 is null) return;
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (KeyMapper.TryMapJoystick(key, out bool up, out bool down, out bool left, out bool right, out bool fire))
-        {
-            var j = _joystickPort2 ? _c64.Joystick2 : _c64.Joystick1;
-            if (up) j.Up = false;
-            if (down) j.Down = false;
-            if (left) j.Left = false;
-            if (right) j.Right = false;
-            if (fire) j.Fire = false;
+        if (_session is null || _runner is null) return;
+        var key = WpfKeyCodes.ResolveKey(e);
+        if (!WpfKeyCodes.TryGetCode(key, out var code)) return;
+        var session = _session;
+        _runner.Invoke(() => session.KeyUp(code));
+        if (session.Bindings.TryGet(code, out _))
             e.Handled = true;
-            return;
-        }
-        if (KeyMapper.IsRestore(key))
-        {
-            _c64.Keyboard.SetRestore(false);
-            e.Handled = true;
-            return;
-        }
-        if (_heldKeys.Remove(key, out var list))
-        {
-            foreach (var k in list)
-            {
-                if (k is C64Key.LeftShift && IsShiftHeldByOther(key)) continue;
-                _c64.Keyboard.Release(k);
-            }
-            e.Handled = true;
-        }
-    }
-
-    private bool IsShiftHeldByOther(Key except)
-    {
-        foreach (var (k, list) in _heldKeys)
-            if (k != except && list.Contains(C64Key.LeftShift)) return true;
-        return false;
     }
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        _c64?.Keyboard.ReleaseAll();
-        _c64?.Joystick1.Clear();
-        _c64?.Joystick2.Clear();
-        _heldKeys.Clear();
+        if (_session is null || _runner is null) return;
+        var session = _session;
+        _runner.Invoke(session.ReleaseAllInput);
     }
 
     #endregion
@@ -239,8 +261,8 @@ public partial class MainWindow : Window
 
     private void AttachDisk(bool autostart)
     {
-        if (_c64 is null || _host is null) return;
-        if (_c64.Drive is null)
+        if (_session is null || _runner is null) return;
+        if (_session.Roms.Drive1541 is null)
         {
             MessageBox.Show(this, "No 1541 ROM available, the drive cannot be enabled.", "Drive", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -249,16 +271,13 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            var d64 = D64Image.Load(dlg.FileName);
-            var gcr = GcrDisk.FromD64(d64);
+            var data = File.ReadAllBytes(dlg.FileName);
+            var name = Path.GetFileName(dlg.FileName);
+            var session = _session;
+            _runner.Invoke(() => session.AttachDisk(data, name, autostart));
             _diskPath = dlg.FileName;
-            _host.Invoke(() =>
-            {
-                _c64.Drive!.InsertDisk(gcr, writeProtected: false);
-                if (autostart)
-                    _c64.AutostartFromDisk("*");
-            });
-            MediaText.Text = $"Disk: {Path.GetFileName(dlg.FileName)} ({d64.DiskName})";
+            DriveMenu.IsChecked = session.Machine.Drive is not null;
+            MediaText.Text = session.MediaDescription;
         }
         catch (Exception ex)
         {
@@ -268,21 +287,23 @@ public partial class MainWindow : Window
 
     private void EjectDisk_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64?.Drive is null || _host is null) return;
-        _host.Invoke(() => _c64.Drive!.InsertDisk(null));
+        if (_session is null || _runner is null) return;
+        var session = _session;
+        _runner.Invoke(session.EjectDisk);
         _diskPath = null;
+        MediaText.Text = _romDescription;
     }
 
     private void SaveDisk_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64?.Drive?.Disk.Disk is null || _host is null) return;
+        if (_session?.Machine.Drive?.Disk.Disk is null || _runner is null) return;
         var dlg = new SaveFileDialog { Filter = "Disk images (*.d64)|*.d64", FileName = _diskPath is null ? "disk.d64" : Path.GetFileName(_diskPath) };
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            var d64 = _host.Invoke(() => _c64.Drive!.Disk.Disk!.ToD64());
-            d64.Save(dlg.FileName);
-            _host.Invoke(() => _c64.Drive!.Disk.MarkSaved());
+            var session = _session;
+            var d64 = _runner.Invoke(session.SaveDisk);
+            d64?.Save(dlg.FileName);
         }
         catch (Exception ex)
         {
@@ -290,37 +311,32 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AttachTape_Click(object sender, RoutedEventArgs e)
+    private void AttachTape_Click(object sender, RoutedEventArgs e) => AttachTape();
+
+    private void AttachTape()
     {
-        if (_c64 is null || _host is null) return;
+        if (_session is null || _runner is null) return;
         var dlg = new OpenFileDialog { Filter = "Tape images and programs (*.t64;*.prg)|*.t64;*.prg|All files|*.*", Title = "Attach tape image / program" };
         if (dlg.ShowDialog(this) != true) return;
         try
         {
             var data = File.ReadAllBytes(dlg.FileName);
-            PrgFile program;
-            string name;
+            int index = 0;
             if (T64Image.IsT64(data))
             {
                 var t64 = T64Image.Load(data);
                 if (t64.Entries.Count == 0) throw new InvalidDataException("The tape image contains no files");
-                int index = 0;
                 if (t64.Entries.Count > 1)
                 {
                     var chooser = new SelectEntryWindow(t64) { Owner = this };
                     if (chooser.ShowDialog() != true) return;
                     index = chooser.SelectedIndex;
                 }
-                program = t64.GetProgram(index);
-                name = t64.Entries[index].Name;
             }
-            else
-            {
-                program = PrgFile.FromBytes(data);
-                name = Path.GetFileName(dlg.FileName);
-            }
-            _host.Invoke(() => _c64.InjectProgram(program, run: true));
-            MediaText.Text = $"Program: {name} (${program.LoadAddress:X4}-${program.LoadAddress + program.Data.Length - 1:X4})";
+            var name = Path.GetFileName(dlg.FileName);
+            var session = _session;
+            _runner.Invoke(() => session.AttachProgram(data, name, index, run: true));
+            MediaText.Text = session.MediaDescription;
         }
         catch (Exception ex)
         {
@@ -330,18 +346,16 @@ public partial class MainWindow : Window
 
     private void AttachCartridge_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64 is null || _host is null) return;
+        if (_session is null || _runner is null) return;
         var dlg = new OpenFileDialog { Filter = "Cartridge images (*.crt;*.bin)|*.crt;*.bin|All files|*.*", Title = "Attach cartridge" };
         if (dlg.ShowDialog(this) != true) return;
         try
         {
-            var cart = Cartridge.Load(dlg.FileName);
-            _host.Invoke(() =>
-            {
-                _c64.AttachCartridge(cart);
-                _c64.Reset(hard: false);
-            });
-            MediaText.Text = $"Cartridge: {cart.Name}";
+            var data = File.ReadAllBytes(dlg.FileName);
+            var name = Path.GetFileNameWithoutExtension(dlg.FileName);
+            var session = _session;
+            _runner.Invoke(() => session.AttachCartridge(data, name));
+            MediaText.Text = session.MediaDescription;
         }
         catch (Exception ex)
         {
@@ -351,94 +365,140 @@ public partial class MainWindow : Window
 
     private void DetachCartridge_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64 is null || _host is null) return;
-        _host.Invoke(() =>
-        {
-            _c64.AttachCartridge(null);
-            _c64.Reset(hard: false);
-        });
+        if (_session is null || _runner is null) return;
+        var session = _session;
+        _runner.Invoke(session.DetachCartridge);
+        MediaText.Text = _romDescription;
     }
 
-    private void Screenshot_Click(object sender, RoutedEventArgs e)
+    private void Screenshot_Click(object sender, RoutedEventArgs e) => SaveScreenshot();
+
+    private void SaveScreenshot()
     {
-        if (_c64 is null || _host is null) return;
+        if (_session is null || _runner is null) return;
         var dlg = new SaveFileDialog { Filter = "PNG image (*.png)|*.png", FileName = $"c64-{DateTime.Now:yyyyMMdd-HHmmss}.png" };
         if (dlg.ShowDialog(this) != true) return;
-        var frame = _host.Invoke(() => (uint[])_c64.Vic.Frame.Clone());
-        var crop = new uint[Visible.Width * Visible.Height];
-        for (int y = 0; y < Visible.Height; y++)
-            Array.Copy(frame, (Visible.Y + y) * VicII.FrameWidth + Visible.X, crop, y * Visible.Width, Visible.Width);
-        PngWriter.Save(dlg.FileName, Visible.Width, Visible.Height, crop);
+        try
+        {
+            var session = _session;
+            int width = _videoSink?.Width ?? 384, height = _videoSink?.Height ?? 272;
+            var pixels = new uint[width * height];
+            _runner.Invoke(() => new VideoFrame(session.Machine.Vic.Frame, session.Machine.Frames).CopyVisible(pixels));
+            PngWriter.Save(dlg.FileName, width, height, pixels);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Cannot save screenshot", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void Reset_Click(object sender, RoutedEventArgs e) => _host?.Invoke(() => _c64!.Reset(hard: false));
-    private void HardReset_Click(object sender, RoutedEventArgs e) => _host?.Invoke(() => _c64!.Reset(hard: true));
+    private void Reset_Click(object sender, RoutedEventArgs e) => DoReset(hard: false);
+    private void HardReset_Click(object sender, RoutedEventArgs e) => DoReset(hard: true);
 
-    private void Pause_Click(object sender, RoutedEventArgs e)
-    {
-        if (_host is null) return;
-        _host.Paused = PauseMenu.IsChecked;
-        _memoryViewer?.OnFreezeChanged();
-    }
+    private void Pause_Click(object sender, RoutedEventArgs e) => SetPaused(PauseMenu.IsChecked);
 
-    private void Warp_Click(object sender, RoutedEventArgs e)
-    {
-        if (_host is null) return;
-        _host.Warp = WarpMenu.IsChecked;
-    }
+    private void Warp_Click(object sender, RoutedEventArgs e) => SetWarp(WarpMenu.IsChecked);
 
     private void Drive_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64 is null || _host is null) return;
-        _host.Invoke(() =>
+        if (_session is null || _runner is null) return;
+        bool enable = DriveMenu.IsChecked;
+        var session = _session;
+        _runner.Invoke(() =>
         {
-            if (DriveMenu.IsChecked)
-                _c64.AttachDrive(8);
+            if (enable)
+            {
+                if (session.Machine.Drive is null) session.Machine.AttachDrive(8);
+            }
             else
-                _c64.DetachDrive();
+            {
+                session.EjectDisk();
+                session.Machine.DetachDrive();
+            }
         });
+        if (!enable) _diskPath = null;
     }
 
-    private void JoyPort_Click(object sender, RoutedEventArgs e)
+    private void SwapJoystickPorts_Click(object sender, RoutedEventArgs e)
     {
-        _joystickPort2 = ReferenceEquals(sender, JoyPort2Menu);
-        JoyPort1Menu.IsChecked = !_joystickPort2;
-        JoyPort2Menu.IsChecked = _joystickPort2;
-        _c64?.Joystick1.Clear();
-        _c64?.Joystick2.Clear();
+        if (_session is null || _runner is null) return;
+        var bindings = _session.Bindings;
+        var swapped = new List<(string Code, InputAction Action)>();
+        foreach (var (code, action) in bindings.All)
+            if (action.Kind == InputActionKind.Joystick)
+                swapped.Add((code, InputAction.ForJoystick(action.JoystickPort == 1 ? 2 : 1, action.Joystick)));
+        var session = _session;
+        _runner.Invoke(() =>
+        {
+            session.ReleaseAllInput();
+            foreach (var (code, action) in swapped)
+                bindings.Set(code, action);
+        });
+        TrySaveBindings();
     }
 
-    private void MemoryViewer_Click(object sender, RoutedEventArgs e)
+    private void MemoryViewer_Click(object sender, RoutedEventArgs e) => ShowMemoryViewer();
+
+    private void ShowMemoryViewer()
     {
-        if (_c64 is null || _host is null) return;
+        if (_runner is null) return;
         if (_memoryViewer is null || !_memoryViewer.IsLoaded)
         {
-            _memoryViewer = new MemoryViewerWindow(_host, PauseMenu) { Owner = this };
+            _memoryViewer = new MemoryViewerWindow(_runner, SetPaused) { Owner = this };
             _memoryViewer.Closed += (_, _) => _memoryViewer = null;
         }
         _memoryViewer.Show();
         _memoryViewer.Activate();
     }
 
+    private void KeyBindings_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runner is null) return;
+        var editor = new KeyBindingsWindow(_runner, BindingsPath) { Owner = this };
+        editor.ShowDialog();
+        UpdateMenuGestures();
+        Focus();
+    }
+
+    private void AudioVisualizer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runner is null || _audioTap is null) return;
+        if (_audioVisualizer is null || !_audioVisualizer.IsLoaded)
+        {
+            _audioVisualizer = new AudioVisualizerWindow(_runner, _audioTap) { Owner = this };
+            _audioVisualizer.Closed += (_, _) => _audioVisualizer = null;
+        }
+        _audioVisualizer.Show();
+        _audioVisualizer.Activate();
+    }
+
     private void TypeText_Click(object sender, RoutedEventArgs e)
     {
-        if (_c64 is null || _host is null) return;
+        if (_session is null || _runner is null) return;
         var w = new TypeTextWindow { Owner = this };
         if (w.ShowDialog() == true)
-            _host.Invoke(() => _c64.TypeText(w.Text));
+        {
+            var session = _session;
+            var text = w.Text;
+            _runner.Invoke(() => session.TypeText(text));
+        }
     }
 
     private void KeyboardHelp_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(this,
-            "Keys are mapped by position where possible.\n\n" +
+            "Every PC key can be bound to a C64 key, a joystick input or a command with Tools > Key Bindings...\n" +
+            "(the Joystick panel there picks the keys that make up joystick 1 and 2). Bindings are stored in\n" +
+            BindingsPath + "\n\n" +
+            "Default layout (positional where possible):\n" +
             "Escape = RUN/STOP, Tab = C=, Backspace = INST/DEL, Home/End = CLR/HOME, Page Up = RESTORE\n" +
             "Cursor keys = CRSR keys, F1-F8 = function keys, Ctrl = CTRL\n" +
             "[ = @, ] = *, ` = <-, \\ = £\n\n" +
-            "Joystick: numeric keypad 8/2/4/6 (7/9/1/3 diagonals), 0 / 5 / Right Alt = fire (port selectable in Machine menu)\n\n" +
-            "F9 attach disk, F10 attach program, F11 reset, F12 screenshot, Pause = freeze, Alt+W warp, Alt+M memory viewer",
+            "Joystick (port 2): numeric keypad 8/2/4/6, 0 / 5 / Right Alt = fire. Machine > Swap Joystick Ports moves it to port 1.\n\n" +
+            "Bound commands (default): F11 reset, F12 screenshot, Pause = freeze.\n" +
+            "Window shortcuts: F9 attach disk, F10 attach program, Alt+W warp, Alt+M memory viewer.",
             "Keyboard", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -455,7 +515,15 @@ public partial class MainWindow : Window
         CompositionTarget.Rendering -= OnRendering;
         _statusTimer.Stop();
         _memoryViewer?.Close();
-        _host?.Dispose();
-        _host = null;
+        _audioVisualizer?.Close();
+        if (_session is not null)
+        {
+            _session.Command -= OnSessionCommand;
+            _session.Bindings.Changed -= OnBindingsChanged;
+        }
+        _runner?.Dispose();
+        _runner = null;
+        _audioOutput?.Dispose();
+        _audioOutput = null;
     }
 }
