@@ -40,10 +40,10 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
           dotnet-quality: preview
-      - name: Restore
-        run: dotnet restore src/Tedd.MOS65xx.sln
+      # The test project pulls in the emulator core, the hosting layer and the Unity facade; the front-ends are
+      # built by their own jobs (the Blazor project would additionally need the wasm-tools workload here).
       - name: Build
-        run: dotnet build src/Tedd.MOS65xx.sln -c Release --no-restore
+        run: dotnet build src/Tedd.MOS65xx.Tests/Tedd.MOS65xx.Tests.csproj -c Release
       - name: Test (fast suite; ROM-dependent tests skip themselves)
         run: dotnet test src/Tedd.MOS65xx.Tests/Tedd.MOS65xx.Tests.csproj -c Release --no-build --filter "Category!=Slow&Category!=Harte&Category!=Lorenz" --logger "trx;LogFileName=tests.trx"
       - uses: actions/upload-artifact@v4
