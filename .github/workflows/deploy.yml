@@ -5,7 +5,7 @@
 #     (Tedd.MOS65xx-win-x64.zip), the SDL2 front-end for Windows and Linux, and the Unity package
 #   * the Blazor WebAssembly site published to GitHub Pages (Settings > Pages > Source must be "GitHub Actions")
 #
-# ROM images are never part of the repository. The web build ships OpenROMs (GPL-3, MEGA65/open-roms) as the
+# ROM images are never part of the repository. The web build ships OpenROMs (LGPL-3, MEGA65/open-roms) as the
 # default free ROM set when tools/fetch-openroms.sh succeeds; users can upload their own ROMs in the browser.
 
 name: Deploy
