@@ -43,7 +43,7 @@ public sealed class Drive1541
             (_bus.DataLow ? 0x01 : 0) |
             (_bus.ClkLow ? 0x04 : 0) |
             (_bus.AtnLow ? 0x80 : 0) |
-            deviceBits | 0x5A);
+            deviceBits | 0x1A);
         Via1.PortAInput = () => 0xFF; // parallel port (unused)
         Via1.PortBChanged += UpdateBusOutputs;
         bus.Changed += OnBusChanged;
