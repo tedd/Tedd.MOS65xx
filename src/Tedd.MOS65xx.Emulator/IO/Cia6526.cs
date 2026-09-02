@@ -110,6 +110,13 @@ public sealed class Cia6526 : IClockable
     private ushort _latchA, _latchB;
     private byte _cra, _crb;
     private bool _pb6Toggle, _pb7Toggle;   // underflow toggle flip-flops (set to 1 when the timer is started)
+    // RUNMODE (one-shot) as seen by the underflow logic is the bit as written now OR as it stood at the end of the
+    // previous cycle (Hoxs64: "(delay | feed) & OneShotA0"): setting it in the underflow cycle still stops the
+    // timer, and clearing it in the underflow cycle does not prevent the stop (Lorenz tests "flipos", "cia1ta" #19).
+    private bool _oneShotA1, _oneShotB1;
+    // True during the cycle after a reload (Hoxs64 "LoadA2"): a latch write in that cycle updates the counter at
+    // once instead of waiting for the next underflow (Lorenz "cia1ta" test #08).
+    private bool _loadA2, _loadB2;
     private bool _pb6Out, _pb7Out;         // level currently driven on PB6/PB7 when the timer output is enabled
 
     // Interrupts
@@ -120,7 +127,7 @@ public sealed class Cia6526 : IClockable
     private bool _sdrPending;
 
     // External pins
-    private bool _cnt;
+    private bool _cnt = true;             // CNT pin idles high (Lorenz test "cntdef")
     private bool _flag;
 
     // Serial data register
@@ -245,6 +252,7 @@ public sealed class Cia6526 : IClockable
     /// </summary>
     public void Reset()
     {
+        _oneShotA1 = _oneShotB1 = false;
         byte oldA = PortAOutput, oldB = PortBOutput;
 
         _delay = 0;
@@ -397,6 +405,7 @@ public sealed class Cia6526 : IClockable
 
             case RegTaLo:
                 _latchA = (ushort)((_latchA & 0xFF00) | value);
+                if (_loadA2) _ta = _latchA;
                 break;
             case RegTaHi:
                 _latchA = (ushort)((_latchA & 0x00FF) | (value << 8));
@@ -404,14 +413,17 @@ public sealed class Cia6526 : IClockable
                 // through Load0 → Load1 like a force load (Lorenz).
                 if ((_cra & 0x01) == 0)
                     _delay |= LoadA0;
+                if (_loadA2) _ta = _latchA;
                 break;
             case RegTbLo:
                 _latchB = (ushort)((_latchB & 0xFF00) | value);
+                if (_loadB2) _tb = _latchB;
                 break;
             case RegTbHi:
                 _latchB = (ushort)((_latchB & 0x00FF) | (value << 8));
                 if ((_crb & 0x01) == 0)
                     _delay |= LoadB0;
+                if (_loadB2) _tb = _latchB;
                 break;
 
             case RegTod10ths:
@@ -643,6 +655,10 @@ public sealed class Cia6526 : IClockable
         ulong delay = _delay;
         byte newIcr = 0;
         bool pbChanged = false;
+        bool oneShotA = _oneShotA1 || (_feed & OneShotA0) != 0;
+        bool oneShotB = _oneShotB1 || (_feed & OneShotB0) != 0;
+        _oneShotA1 = (_feed & OneShotA0) != 0;
+        _oneShotB1 = (_feed & OneShotB0) != 0;
 
         // --- End of the one-cycle PB6/PB7 pulses started by an underflow in the previous cycle (Lorenz PB6Low1) ---
         if ((delay & Pb6Low1) != 0 && _pb6Out)
@@ -667,7 +683,7 @@ public sealed class Cia6526 : IClockable
         {
             newIcr |= IcrTimerA;
             delay |= LoadA1;                          // reload in this cycle
-            if ((_feed & OneShotA0) != 0)
+            if (oneShotA)
             {
                 _cra &= 0xFE;                         // one-shot: START is cleared
                 _feed &= ~CountA2;
@@ -698,10 +714,13 @@ public sealed class Cia6526 : IClockable
                 }
             }
         }
+        // The "just loaded" window (Hoxs64 LoadA2) is open for writes made between this Clock() and the next one.
+        _loadA2 = false;
         if ((delay & LoadA1) != 0)
         {
             _ta = _latchA;
             delay &= ~CountA2;                        // a load swallows the count pulse in flight (Lorenz)
+            _loadA2 = true;
         }
         // CNT pulses (Count0 → Count1) only pass in CNT mode and while the timer is started.
         if ((_cra & 0x20) == 0 || (_cra & 0x01) == 0)
@@ -715,7 +734,7 @@ public sealed class Cia6526 : IClockable
         {
             newIcr |= IcrTimerB;
             delay |= LoadB1;
-            if ((_feed & OneShotB0) != 0)
+            if (oneShotB)
             {
                 _crb &= 0xFE;
                 _feed &= ~CountB2;
@@ -736,9 +755,11 @@ public sealed class Cia6526 : IClockable
                 pbChanged = true;
             }
         }
+        _loadB2 = false;
         if ((delay & LoadB1) != 0)
         {
             _tb = _latchB;
+            _loadB2 = true;
             delay &= ~CountB2;
         }
         // Timer B count source (CRB bits 5-6). Timer A underflow pulses enter at Count1 (Lorenz), so timer B
