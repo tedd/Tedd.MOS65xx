@@ -112,7 +112,13 @@ public sealed class C64
         UpdateCia2PortA();
     }
 
-    /// <summary>Advances the whole machine by one system cycle.</summary>
+    /// <summary>
+    /// Advances the whole machine by one system cycle. Order within the cycle: the VIC's phi1 half (memory
+    /// access, BA, IRQ), then the CIAs, then the CPU's phi2 access (so a register write made in this cycle is
+    /// first seen by the CIA in the next cycle, which is the convention of the Hoxs64/VICE CIA model and what the
+    /// Lorenz test-suite measures), then the SID. The CPU samples the interrupt lines at the end of its cycle and
+    /// therefore sees the CIA state produced in the same cycle.
+    /// </summary>
     public void Clock()
     {
         Vic.Clock();
