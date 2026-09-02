@@ -331,6 +331,48 @@ SHA/AHX SHX SHY TAS/SHS JAM/KIL NOP-with-operand) supported.
 `static void Save(string path, int width, int height, ReadOnlySpan<uint> argb)`; zlib via
 `System.IO.Compression.ZLibStream`, no other dependencies. Used by tests and the GUI screenshot feature.
 
+## Hosting layer — `src/Tedd.MOS65xx.Hosting`
+
+Everything a front-end needs, independent of UI framework. Front-ends (WPF, Blazor/WASM, SDL2, Unity) only
+implement the two sink interfaces and translate their native key events to W3C `KeyboardEvent.code` names.
+
+```csharp
+public interface IVideoSink { void PresentFrame(in VideoFrame frame); }   // frame.CopyVisible/Rgba/Bgra helpers, 384x272
+public interface IAudioSink { int SampleRate { get; } void Write(ReadOnlySpan<short> samples); void Clear(); }
+public sealed class AudioTap : IAudioSink          // decorator keeping the latest samples for visualizers (CopyLatest)
+
+public sealed class EmulatorSession                 // single-threaded; call RunFrame() from the host's loop
+{
+    EmulatorSession(RomSet roms, int sampleRate = 44100, bool attachDrive = true, KeyBindings? bindings = null);
+    C64 Machine; KeyBindings Bindings; IVideoSink Video; IAudioSink Audio; bool Paused; bool Warp;
+    void RunFrame(); void StepCycle(); void StepInstruction(); void Reset(bool hard);
+    void KeyDown(string code); void KeyUp(string code); void SetJoystick(int port, JoystickInput input, bool pressed);
+    void SetKey(C64Key key, bool pressed); void ReleaseAllInput(); void TypeText(string text);
+    event Action<SystemCommand> Command;            // bound host commands (Reset, HardReset, Pause, Warp, Screenshot, MemoryViewer)
+    void AttachDisk(byte[] d64, string name, bool autostart, bool writeProtected = false); void EjectDisk(); D64Image? SaveDisk();
+    void AttachProgram(byte[] t64OrPrg, string name, int entryIndex = 0, bool run = true);
+    void AttachCartridge(byte[] rawOrCrt, string name); void DetachCartridge();
+    void AttachAuto(byte[] data, string fileName, bool autostart = true);   // by extension / content
+    string MediaDescription;
+}
+public sealed class EmulatorRunner : IDisposable    // paced thread for hosts without their own loop
+{
+    EmulatorRunner(EmulatorSession session); void Start(); bool Paused; bool Warp; double MeasuredFps;
+    void Invoke(Action a); T Invoke<T>(Func<T> f);  // exclusive access to the machine (between frames / while frozen)
+}
+public sealed class KeyBindings                     // code -> InputAction, JSON { "KeyA": "key:A", "Numpad8": "joy2:up", "PageUp": "sys:restore" }
+{
+    static KeyBindings CreateDefault(); static KeyBindings FromJson(string); string ToJson(); Save/Load/LoadOrDefault(path);
+    InputAction? Get(string code); bool TryGet(...); void Set(string code, InputAction a); bool Remove(string code); IEnumerable<string> CodesFor(InputAction a);
+    event Action Changed; IReadOnlyDictionary<string, InputAction> All;
+}
+public readonly struct InputAction                  // ForKey(C64Key, shift) | ForJoystick(port 1|2, JoystickInput) | ForSystem(SystemCommand); Parse/ToString/Describe
+public static class KeyCodes                        // All (W3C code names), Display(code)
+```
+
+Key naming: W3C `KeyboardEvent.code` ("KeyA", "Digit1", "Enter", "ShiftLeft", "ArrowUp", "Numpad8", "F1"...).
+Browsers deliver these directly; WPF, SDL2 and Unity hosts keep a table from their native key enums.
+
 ## Tests — `src/Tedd.MOS65xx.Tests`
 
 * `Support/RecordingBus` — 64K RAM that logs every bus access (`BusAccess(Address, Value, IsWrite)`).
