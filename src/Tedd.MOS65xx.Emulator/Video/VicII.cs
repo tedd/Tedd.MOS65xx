@@ -222,7 +222,7 @@ public sealed partial class VicII : IClockable
     /// <summary>Resets all registers and internal state (registers read 0, sprites off, idle state).</summary>
     public void Reset()
     {
-        Array.Clear(_regs);
+        Array.Clear(_regs, 0, _regs.Length);
         _cycle = 0;
         _line = 0;
         _raster = 0;
@@ -232,8 +232,8 @@ public sealed partial class VicII : IClockable
         _badLine = false;
         _displayState = false;
         _vc = _vcBase = _rc = _vmli = 0;
-        Array.Clear(_vbuf);
-        Array.Clear(_cbuf);
+        Array.Clear(_vbuf, 0, _vbuf.Length);
+        Array.Clear(_cbuf, 0, _cbuf.Length);
         _refresh = 0xFF;
         _lastColor = 0;
         _ba = false;

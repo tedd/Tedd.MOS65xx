@@ -72,6 +72,36 @@ public class KeyBindingsTests
     }
 
     [Test]
+    public void Json_Is_Indented_Sorted_And_Handles_Escapes()
+    {
+        var b = new KeyBindings();
+        b.Set("KeyA", InputAction.ForKey(C64Key.A));
+        b.Set("ArrowUp", InputAction.ForKey(C64Key.CursorDown, shift: true));
+        Assert.That(b.ToJson(), Is.EqualTo(
+            "{" + Environment.NewLine +
+            "  \"ArrowUp\": \"key:CursorDown+shift\"," + Environment.NewLine +
+            "  \"KeyA\": \"key:A\"" + Environment.NewLine +
+            "}"));
+        Assert.That(new KeyBindings().ToJson(), Is.EqualTo("{}"));
+
+        // Files written by System.Text.Json (which escapes '+' as +), a BOM, odd whitespace, escaped keys, null values.
+        var c = KeyBindings.FromJson((char)0xFEFF + " {\r\n\t\"ArrowUp\" : \"key:CursorDown\\u002Bshift\" ,\n \"Key\\\"Odd\\\\\": \"joy2:fire\", \"Ignored\": null, \"KeyA\":\"key:A\"}\n");
+        Assert.That(c.Count, Is.EqualTo(3));
+        Assert.That(c.Get("ArrowUp"), Is.EqualTo(InputAction.ForKey(C64Key.CursorDown, shift: true)));
+        Assert.That(c.Get("Key\"Odd\\"), Is.EqualTo(InputAction.ForJoystick(2, JoystickInput.Fire)));
+        Assert.That(c.Get("KeyA"), Is.EqualTo(InputAction.ForKey(C64Key.A)));
+        var d = KeyBindings.FromJson(c.ToJson());
+        Assert.That(d.Get("Key\"Odd\\"), Is.EqualTo(InputAction.ForJoystick(2, JoystickInput.Fire)), "escapes survive a round trip");
+        Assert.That(KeyBindings.FromJson("{}").Count, Is.EqualTo(0));
+
+        Assert.Throws<FormatException>(() => KeyBindings.FromJson("[1, 2]"));
+        Assert.Throws<FormatException>(() => KeyBindings.FromJson("{\"KeyA\": 1}"));
+        Assert.Throws<FormatException>(() => KeyBindings.FromJson("{\"KeyA\": \"key:A\"} x"));
+        Assert.Throws<FormatException>(() => KeyBindings.FromJson("{\"KeyA\": \"key:A\""));
+        Assert.Throws<FormatException>(() => KeyBindings.FromJson("{\"KeyA\": \"bad \\q escape\"}"));
+    }
+
+    [Test]
     public void Save_And_Load()
     {
         var path = Path.Combine(Path.GetTempPath(), "mos65xx-keys-" + Guid.NewGuid().ToString("N") + ".json");

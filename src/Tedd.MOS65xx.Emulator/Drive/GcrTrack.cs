@@ -31,7 +31,7 @@ public sealed class GcrTrack
     /// <summary>Wraps an existing bit stream (the array is used directly, not copied).</summary>
     public GcrTrack(byte[] data, int bitLength)
     {
-        ArgumentNullException.ThrowIfNull(data);
+        if (data is null) throw new ArgumentNullException(nameof(data));
         if (bitLength <= 0)
             throw new ArgumentOutOfRangeException(nameof(bitLength), "A track needs at least one bit cell.");
         if ((long)data.Length * 8 < bitLength)

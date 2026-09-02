@@ -68,9 +68,9 @@ public sealed class Keyboard
 
     public void ReleaseAll()
     {
-        Array.Clear(_pressed);
-        Array.Clear(_rowMasks);
-        Array.Clear(_columnMasks);
+        Array.Clear(_pressed, 0, _pressed.Length);
+        Array.Clear(_rowMasks, 0, _rowMasks.Length);
+        Array.Clear(_columnMasks, 0, _columnMasks.Length);
         RestorePressed = false;
     }
 
@@ -84,7 +84,7 @@ public sealed class Keyboard
         int low = ~rowLevels & 0xFF;
         while (low != 0)
         {
-            int row = System.Numerics.BitOperations.TrailingZeroCount(low);
+            int row = TrailingZeroCount(low);
             low &= low - 1;
             result &= ~_rowMasks[row];
         }
@@ -98,11 +98,23 @@ public sealed class Keyboard
         int low = ~columnLevels & 0xFF;
         while (low != 0)
         {
-            int col = System.Numerics.BitOperations.TrailingZeroCount(low);
+            int col = TrailingZeroCount(low);
             low &= low - 1;
             result &= ~_columnMasks[col];
         }
         return (byte)result;
+    }
+
+    /// <summary>Index of the lowest set bit of a non-zero value (System.Numerics.BitOperations is not in netstandard2.1).</summary>
+    private static int TrailingZeroCount(int value)
+    {
+        int n = 0;
+        while ((value & 1) == 0)
+        {
+            value >>= 1;
+            n++;
+        }
+        return n;
     }
 
     /// <summary>

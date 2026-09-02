@@ -95,7 +95,7 @@ public sealed class GcrDisk
     /// <summary>Replaces the bit stream of a half-track (e.g. with a custom-length track from a G64 file).</summary>
     public void SetTrack(int halfTrack, GcrTrack track)
     {
-        ArgumentNullException.ThrowIfNull(track);
+        if (track is null) throw new ArgumentNullException(nameof(track));
         if (halfTrack < 0 || halfTrack >= HalfTrackCount)
             throw new ArgumentOutOfRangeException(nameof(halfTrack));
         _tracks[halfTrack] = track;
@@ -199,7 +199,7 @@ public sealed class GcrDisk
     /// </summary>
     public static GcrDisk FromD64(D64Image image)
     {
-        ArgumentNullException.ThrowIfNull(image);
+        if (image is null) throw new ArgumentNullException(nameof(image));
         var disk = new GcrDisk(image.TrackCount)
         {
             WriteProtected = image.WriteProtected,
@@ -396,7 +396,7 @@ public sealed class GcrDisk
     /// </summary>
     public static List<int> FindSyncs(GcrTrack track)
     {
-        ArgumentNullException.ThrowIfNull(track);
+        if (track is null) throw new ArgumentNullException(nameof(track));
         int n = track.BitLength;
         var result = new List<int>();
         var seen = new bool[n];
@@ -437,7 +437,7 @@ public sealed class GcrDisk
     /// </summary>
     public static void DecodeTrack(GcrTrack track, int trackNumber, Span<byte> sectorData, Span<byte> errorCodes, bool checkId = false, byte id1 = 0, byte id2 = 0)
     {
-        ArgumentNullException.ThrowIfNull(track);
+        if (track is null) throw new ArgumentNullException(nameof(track));
         int sectors = D64Image.SectorsPerTrack(trackNumber);
         if (sectorData.Length != sectors * D64Image.SectorSize)
             throw new ArgumentException($"Track {trackNumber} needs {sectors * D64Image.SectorSize} data bytes.", nameof(sectorData));

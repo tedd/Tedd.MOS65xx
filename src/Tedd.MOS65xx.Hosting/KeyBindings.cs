@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Json;
 using Tedd.MOS65xx.Emulator.C64;
 
 namespace Tedd.MOS65xx.Hosting;
@@ -74,17 +73,15 @@ public sealed class KeyBindings
     {
         var dict = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in _map) dict[k] = v.ToString();
-        return JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
+        return FlatJson.Write(dict);
     }
 
     public static KeyBindings FromJson(string json)
     {
         var b = new KeyBindings();
-        var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-        if (dict is not null)
-            foreach (var (k, v) in dict)
-                if (InputAction.TryParse(v, out var action))
-                    b._map[k] = action;
+        foreach (var (k, v) in FlatJson.Read(json))
+            if (InputAction.TryParse(v, out var action))
+                b._map[k] = action;
         return b;
     }
 
