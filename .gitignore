@@ -288,3 +288,5 @@ __pycache__/
 *.xsd.cs
 /src/Tedd.MOS65xx.Emulator/*.bin
 /src/Tedd.MOS65xx.GUI/*.bin
+/src/Tedd.MOS65xx.GUI/*.[Dd]64
+/src/Tedd.MOS65xx.GUI/*.[Tt]64
