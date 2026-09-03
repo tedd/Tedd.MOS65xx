@@ -49,6 +49,9 @@
   <ItemGroup>
     <!-- ROM images under wwwroot/roms are git-ignored (see tools/fetch-openroms.*) but published when present. -->
     <Content Update="wwwroot\roms\*.bin" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="wwwroot\roms\c128\*.bin" CopyToPublishDirectory="PreserveNewest" />
+    <!-- The C128 CP/M 3.0 disks (disks/c128 in the repository) are served at disks/c128/ for the "boot CP/M" menu. -->
+    <Content Include="..\..\disks\c128\*.d64;..\..\disks\c128\README.md" Link="wwwroot\disks\c128\%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

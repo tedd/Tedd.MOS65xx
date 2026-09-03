@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
-using Tedd.MOS65xx.Emulator.C64;
+using Tedd.MOS65xx.Emulator.Machines;
 
 namespace Tedd.MOS65xx.Hosting;
 
@@ -19,7 +19,7 @@ public sealed class EmulatorRunner : IDisposable
     private volatile bool _paused;
     private double _measuredFps;
 
-    public EmulatorRunner(EmulatorSession session, string threadName = "C64 emulation")
+    public EmulatorRunner(EmulatorSession session, string threadName = "Commodore emulation")
     {
         Session = session;
         _thread = new Thread(Run) { IsBackground = true, Name = threadName };
@@ -86,7 +86,7 @@ public sealed class EmulatorRunner : IDisposable
     {
         var clock = Stopwatch.StartNew();
         double nextFrame = 0;
-        const double frameSeconds = 1.0 / C64.FrameRate;
+        const double frameSeconds = 1.0 / CommodoreMachine.FrameRate;
         int fpsFrames = 0;
         double fpsStart = 0;
 

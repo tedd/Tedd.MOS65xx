@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Tedd.MOS65xx.Emulator.C64;
+using Tedd.MOS65xx.Emulator.Machines;
 
 namespace Tedd.MOS65xx.Hosting;
 
@@ -114,8 +115,12 @@ public sealed class KeyBindings
     /// Escape = RUN/STOP, Tab = C=, Backspace = INST/DEL, Home/End = CLR/HOME, cursor keys, F1-F8,
     /// numeric keypad = joystick 2 (8/2/4/6 + 0/5 fire, 7/9/1/3 diagonals are two actions in the host),
     /// Page Up = RESTORE, F11 = reset, F12 = screenshot, Pause = freeze, Alt+W warp (host shortcuts).
+    /// The C128's extra keys are bound where the PC keyboard has room (Numpad 1/3/7/9, Page Down = HELP,
+    /// Scroll Lock = NO SCROLL, Left Alt = ALT, Caps Lock = CAPS LOCK); with <paramref name="model"/> =
+    /// <see cref="MachineModel.C128"/> the layout follows the C128 keyboard more closely: Escape = ESC,
+    /// Tab = TAB, End = RUN/STOP, Right Ctrl = C=, the whole numeric keypad is the keypad and F9 toggles 40/80.
     /// </summary>
-    public static KeyBindings CreateDefault()
+    public static KeyBindings CreateDefault(MachineModel model = MachineModel.C64)
     {
         var b = new KeyBindings();
         void K(string code, C64Key key, bool shift = false) => b._map[code] = InputAction.ForKey(key, shift);
@@ -145,6 +150,19 @@ public sealed class KeyBindings
         J("Numpad6", 2, JoystickInput.Right); J("Numpad0", 2, JoystickInput.Fire); J("Numpad5", 2, JoystickInput.Fire);
         J("AltRight", 2, JoystickInput.Fire);
         S("PageUp", SystemCommand.Restore); S("F11", SystemCommand.Reset); S("F12", SystemCommand.Screenshot); S("Pause", SystemCommand.Pause);
+        // C128 keys that have a free PC key (they do nothing on a C64).
+        K("Numpad1", C64Key.Keypad1); K("Numpad3", C64Key.Keypad3); K("Numpad7", C64Key.Keypad7); K("Numpad9", C64Key.Keypad9);
+        K("PageDown", C64Key.Help); K("ScrollLock", C64Key.NoScroll); K("AltLeft", C64Key.Alt);
+        S("CapsLock", SystemCommand.CapsLock);
+        if (model == MachineModel.C128)
+        {
+            K("Escape", C64Key.Escape); K("Tab", C64Key.Tab); K("End", C64Key.RunStop); K("ControlRight", C64Key.Commodore);
+            K("Numpad8", C64Key.Keypad8); K("Numpad2", C64Key.Keypad2); K("Numpad4", C64Key.Keypad4); K("Numpad6", C64Key.Keypad6);
+            K("Numpad0", C64Key.Keypad0); K("Numpad5", C64Key.Keypad5); K("NumpadEnter", C64Key.KeypadEnter);
+            K("NumpadAdd", C64Key.KeypadPlus); K("NumpadSubtract", C64Key.KeypadMinus); K("NumpadDecimal", C64Key.KeypadPeriod);
+            K("ArrowUp", C64Key.Up); K("ArrowDown", C64Key.Down); K("ArrowLeft", C64Key.Left); K("ArrowRight", C64Key.Right);
+            S("F9", SystemCommand.ToggleColumns);
+        }
         return b;
     }
 }

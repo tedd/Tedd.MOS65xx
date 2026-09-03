@@ -24,6 +24,11 @@
                 <MenuItem Header="E_xit" Click="Exit_Click" />
             </MenuItem>
             <MenuItem Header="_Machine">
+                <MenuItem x:Name="C64Menu" Header="Commodore _64" IsCheckable="True" Click="SelectC64_Click"
+                          ToolTip="Restart as a Commodore 64 (needs the C64 ROMs)" />
+                <MenuItem x:Name="C128Menu" Header="Commodore _128" IsCheckable="True" Click="SelectC128_Click"
+                          ToolTip="Restart as a Commodore 128 (needs the C128 ROMs, see Help > ROMs)" />
+                <Separator />
                 <MenuItem x:Name="ResetMenu" Header="_Reset" Click="Reset_Click" InputGestureText="F11" />
                 <MenuItem x:Name="HardResetMenu" Header="_Hard Reset (power cycle)" Click="HardReset_Click" />
                 <Separator />
@@ -33,6 +38,15 @@
                 <MenuItem x:Name="DriveMenu" Header="1541 Drive (device 8)" IsCheckable="True" Click="Drive_Click" />
                 <MenuItem Header="Swap _Joystick Ports" Click="SwapJoystickPorts_Click"
                           ToolTip="Exchanges every joystick 1 and joystick 2 key binding" />
+                <Separator x:Name="C128Separator" />
+                <MenuItem x:Name="ColumnsMenu" Header="40/80 DISPLAY key down (80 columns)" IsCheckable="True" Click="Columns_Click"
+                          ToolTip="The C128's 40/80 DISPLAY key; the KERNAL reads it at reset and on ESC X" />
+                <MenuItem x:Name="CapsLockMenu" Header="CAPS LOCK key down" IsCheckable="True" Click="CapsLock_Click" />
+                <MenuItem x:Name="DisplayMenu" Header="Show">
+                    <MenuItem x:Name="DisplayAutoMenu" Header="Follow the 40/80 key" IsCheckable="True" IsChecked="True" Click="DisplayAuto_Click" />
+                    <MenuItem x:Name="DisplayVicMenu" Header="40 column screen (VIC-IIe)" IsCheckable="True" Click="DisplayVic_Click" />
+                    <MenuItem x:Name="DisplayVdcMenu" Header="80 column screen (VDC)" IsCheckable="True" Click="DisplayVdc_Click" />
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Tools">
                 <MenuItem x:Name="MemoryViewerMenu" Header="_Memory Viewer / Editor..." Click="MemoryViewer_Click" InputGestureText="Alt+M" />
@@ -45,6 +59,7 @@
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Keyboard Help" Click="KeyboardHelp_Click" />
+                <MenuItem Header="_ROMs" Click="RomHelp_Click" />
                 <MenuItem Header="_About" Click="About_Click" />
             </MenuItem>
         </Menu>
@@ -62,6 +77,10 @@
             <Separator />
             <StatusBarItem>
                 <TextBlock x:Name="StateText" Text="Running" MinWidth="80" />
+            </StatusBarItem>
+            <Separator />
+            <StatusBarItem>
+                <TextBlock x:Name="MachineText" Text="" MinWidth="60" />
             </StatusBarItem>
             <Separator />
             <StatusBarItem>

@@ -7,15 +7,17 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Tedd.MOS65xx.Emulator.C128;
 using Tedd.MOS65xx.Emulator.C64;
 using Tedd.MOS65xx.Emulator.Cpu;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Media;
 using Tedd.MOS65xx.Hosting;
 
 namespace Tedd.MOS65xx.GUI;
 
 /// <summary>
-/// Hex viewer/editor for the C64 (and 1541) memory. Editing is done through the emulator runner so that the
+/// Hex viewer/editor for the C64 / C128 (and 1541) memory. Editing is done through the emulator runner so that the
 /// machine is never touched from the UI thread while it is running; "Freeze" stops the machine so values are
 /// stable and single stepping is possible.
 /// </summary>
@@ -46,7 +48,7 @@ public partial class MemoryViewerWindow : Window
         OnFreezeChanged();
     }
 
-    private C64 Machine => _runner.Session.Machine;
+    private CommodoreMachine Machine => _runner.Session.Machine;
 
     /// <summary>Called by the main window when the pause state changes elsewhere.</summary>
     public void OnFreezeChanged()
@@ -72,6 +74,7 @@ public partial class MemoryViewerWindow : Window
             MemorySource.ColorRam => 0x400,
             MemorySource.Vic => 0x4000,
             MemorySource.DriveRam => 0x800,
+            MemorySource.Ram => Machine.Ram.Length,
             _ => 0x10000,
         };
         BuildRows();
@@ -119,16 +122,16 @@ public partial class MemoryViewerWindow : Window
         switch (_source)
         {
             case MemorySource.Cpu:
-                for (int i = 0; i < data.Length; i++) data[i] = m.Memory.Peek((ushort)i);
+                for (int i = 0; i < data.Length; i++) data[i] = m.PeekMemory((ushort)i);
                 break;
             case MemorySource.Ram:
-                Array.Copy(m.Memory.Ram, data, data.Length);
+                Array.Copy(m.Ram, data, Math.Min(data.Length, m.Ram.Length));
                 break;
             case MemorySource.ColorRam:
-                Array.Copy(m.Memory.ColorRam, data, data.Length);
+                Array.Copy(m.ColorRam, data, Math.Min(data.Length, m.ColorRam.Length));
                 break;
             case MemorySource.Vic:
-                for (int i = 0; i < data.Length; i++) data[i] = m.Memory.ReadVic(i);
+                for (int i = 0; i < data.Length; i++) data[i] = m.VicMemory.PeekVic(i);
                 break;
             case MemorySource.DriveRam:
                 if (m.Drive is { } d) Array.Copy(d.Memory.Ram, data, data.Length);
@@ -147,10 +150,15 @@ public partial class MemoryViewerWindow : Window
             var m = Machine;
             switch (_source)
             {
-                case MemorySource.Cpu: m.Memory.Write((ushort)address, value); break;
-                case MemorySource.Ram: m.Memory.Ram[address & 0xFFFF] = value; break;
-                case MemorySource.ColorRam: m.Memory.ColorRam[address & 0x3FF] = (byte)(value & 0x0F); break;
-                case MemorySource.Vic: m.Memory.Ram[((m.Memory.VicBank << 14) | (address & 0x3FFF)) & 0xFFFF] = value; break;
+                case MemorySource.Cpu: m.WriteMemory((ushort)address, value); break;
+                case MemorySource.Ram: if (address < m.Ram.Length) m.Ram[address] = value; break;
+                case MemorySource.ColorRam: m.ColorRam[address & 0x3FF] = (byte)(value & 0x0F); break;
+                case MemorySource.Vic:
+                {
+                    int bank64 = m is C128 c ? c.Mmu.VicRamBank << 16 : 0;
+                    m.Ram[bank64 | (m.VicBank << 14) | (address & 0x3FFF)] = value;
+                    break;
+                }
                 case MemorySource.DriveRam: if (m.Drive is { } d) d.Memory.Ram[address & 0x7FF] = value; break;
                 case MemorySource.DriveCpu: if (m.Drive is { } d2) d2.Memory.Write((ushort)address, value); break;
             }
@@ -162,6 +170,13 @@ public partial class MemoryViewerWindow : Window
         var c = _source is MemorySource.DriveRam or MemorySource.DriveCpu ? Machine.Drive?.Cpu : Machine.Cpu;
         if (c is null) return "(no drive)";
         var sb = new StringBuilder();
+        if (Machine is C128 c128 && c128.Z80Active && _source is not (MemorySource.DriveRam or MemorySource.DriveCpu))
+        {
+            var z = c128.Z80;
+            sb.Append($"Z80 (active)  PC ${z.PC:X4}  SP ${z.SP:X4}  AF ${z.AF:X4}  BC ${z.BC:X4}  DE ${z.DE:X4}  HL ${z.HL:X4}\n");
+            sb.Append($"IX ${z.IX:X4}  IY ${z.IY:X4}  I ${z.I:X2}  R ${z.R:X2}  IM{z.InterruptMode}  IFF1 {(z.Iff1 ? 1 : 0)}  T-states {z.Cycles:N0}{(z.Halted ? "  HALT" : "")}\n");
+            sb.Append("8502 (halted) ");
+        }
         sb.Append($"PC ${c.PC:X4}  A ${c.A:X2}  X ${c.X:X2}  Y ${c.Y:X2}  S ${c.S:X2}\n");
         sb.Append("P  ").Append((c.P & 0x80) != 0 ? 'N' : '.').Append((c.P & 0x40) != 0 ? 'V' : '.').Append('-')
           .Append((c.P & 0x10) != 0 ? 'B' : '.').Append((c.P & 0x08) != 0 ? 'D' : '.').Append((c.P & 0x04) != 0 ? 'I' : '.')
@@ -185,7 +200,7 @@ public partial class MemoryViewerWindow : Window
         }
         else
         {
-            read = a => Machine.Memory.Peek(a);
+            read = a => Machine.PeekMemory(a);
             pc = Machine.Cpu.PC;
         }
         for (int i = 0; i < 12; i++)
@@ -202,7 +217,16 @@ public partial class MemoryViewerWindow : Window
         var m = Machine;
         var sb = new StringBuilder();
         sb.Append($"Frame {m.Frames}  Raster {m.Vic.RasterLine}/{m.Vic.RasterCycle}  Cycles {m.Cycles:N0}\n");
-        sb.Append($"$01 = ${m.Memory.PortData:X2} (DDR ${m.Memory.PortDdr:X2})  VIC bank {m.Memory.VicBank}  Screen ${m.ScreenAddress:X4}\n");
+        if (m is C64 c64)
+            sb.Append($"$01 = ${c64.Memory.PortData:X2} (DDR ${c64.Memory.PortDdr:X2})  VIC bank {m.VicBank}  Screen ${m.ScreenAddress:X4}\n");
+        else if (m is C128 c128)
+        {
+            var mmu = c128.Mmu;
+            sb.Append($"$01 = ${c128.Memory.PortData:X2} (DDR ${c128.Memory.PortDdr:X2})  VIC bank {m.VicBank} (RAM bank {mmu.VicRamBank})  Screen ${m.ScreenAddress:X4}\n");
+            sb.Append($"MMU CR ${mmu.Cr:X2} MCR ${mmu.Mcr:X2} RCR ${mmu.Rcr:X2} P0 ${mmu.Page0Bank}:{mmu.Page0:X2} P1 ${mmu.Page1Bank}:{mmu.Page1:X2}  " +
+                      $"{(c128.C64Mode ? "C64 mode" : "C128 mode")}  {(c128.Z80Active ? "Z80" : "8502")}{(c128.Vic.FastMode ? " 2 MHz" : "")}  " +
+                      $"40/80 key: {(c128.Display40Columns ? "40" : "80")}  VDC R{c128.Vdc.SelectedRegister} raster {c128.Vdc.RasterLine}\n");
+        }
         sb.Append($"IEC ATN {(m.Iec.AtnLow ? "L" : "H")} CLK {(m.Iec.ClkLow ? "L" : "H")} DATA {(m.Iec.DataLow ? "L" : "H")}\n");
         if (m.Drive is { } d)
             sb.Append($"1541: track {d.Disk.Track:0.#} motor {(d.MotorOn ? "on" : "off")} LED {(d.Led ? "on" : "off")} PC ${d.Cpu.PC:X4}\n");

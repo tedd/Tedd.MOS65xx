@@ -1,14 +1,27 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Tedd.MOS65xx.Emulator.C128;
 using Tedd.MOS65xx.Emulator.C64;
 using Tedd.MOS65xx.Emulator.Drive;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Media;
 
 namespace Tedd.MOS65xx.Hosting;
 
+/// <summary>Which picture a session presents when the machine has two video chips (the C128).</summary>
+public enum DisplayOutput
+{
+    /// <summary>Follow the 40/80 DISPLAY key: the VIC-II when it is up (40 columns), the VDC when it is down.</summary>
+    Auto,
+    /// <summary>Always the VIC-II (40 columns).</summary>
+    VicII,
+    /// <summary>Always the VDC (80 columns; C128 only, falls back to the VIC-II on a C64).</summary>
+    Vdc,
+}
+
 /// <summary>
-/// A running C64 with its input bindings and output surfaces, independent of any UI framework.
+/// A running Commodore 64 or 128 with its input bindings and output surfaces, independent of any UI framework.
 /// The session is single-threaded: call <see cref="RunFrame"/> from whatever loop the host has (a dedicated
 /// thread via <see cref="EmulatorRunner"/>, a browser animation frame, a game engine update) and feed input
 /// through <see cref="KeyDown"/>/<see cref="KeyUp"/> (W3C key codes) or the joystick/typing helpers.
@@ -17,27 +30,74 @@ public sealed class EmulatorSession
 {
     private readonly short[] _audioScratch = new short[8192];
     private readonly Dictionary<string, InputAction> _held = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<C64Key> _pressedKeys = new();
     private int _shiftHolders;
     private IVideoSink _video = NullVideoSink.Instance;
     private IAudioSink _audio;
     private bool _warp;
 
+    /// <summary>A Commodore 64.</summary>
     public EmulatorSession(RomSet roms, int sampleRate = 44100, bool attachDrive = true, KeyBindings? bindings = null)
+        : this(new C64(roms, sampleRate), roms, null, sampleRate, attachDrive, bindings)
     {
-        Roms = roms;
-        Machine = new C64(roms, sampleRate);
-        SampleRate = sampleRate;
-        _audio = new NullAudioSink(sampleRate);
-        Bindings = bindings ?? KeyBindings.CreateDefault();
-        if (attachDrive && roms.Drive1541 is not null)
-            Machine.AttachDrive(8);
     }
 
+    /// <summary>A Commodore 128 (<paramref name="columns80"/> presses the 40/80 DISPLAY key so it boots on the VDC).</summary>
+    public EmulatorSession(C128RomSet roms, int sampleRate = 44100, bool attachDrive = true, KeyBindings? bindings = null, bool columns80 = false)
+        : this(new C128(roms, sampleRate) { Display40Columns = !columns80 }, roms.ToC64RomSet(), roms, sampleRate, attachDrive, bindings)
+    {
+    }
+
+    private EmulatorSession(CommodoreMachine machine, RomSet roms, C128RomSet? c128Roms, int sampleRate, bool attachDrive, KeyBindings? bindings)
+    {
+        Machine = machine;
+        Roms = roms;
+        C128Roms = c128Roms;
+        SampleRate = sampleRate;
+        _audio = new NullAudioSink(sampleRate);
+        Bindings = bindings ?? KeyBindings.CreateDefault(machine.Model);
+        if (attachDrive && HasDriveRom)
+            Machine.AttachDrive(8);
+        if (machine is C128 c128)
+            c128.Reset(hard: true);
+    }
+
+    /// <summary>The machine model of this session.</summary>
+    public MachineModel Model => Machine.Model;
+
+    /// <summary>The C64 ROM set (for a C128 session: its C64 mode ROMs).</summary>
     public RomSet Roms { get; }
-    public C64 Machine { get; }
+    /// <summary>The C128 ROM set, or null for a C64 session.</summary>
+    public C128RomSet? C128Roms { get; }
+    /// <summary>True when the ROM set includes a 1541 DOS, i.e. a drive can be attached.</summary>
+    public bool HasDriveRom => Roms.Drive1541 is not null;
+    /// <summary>Description of the ROM images in use.</summary>
+    public string RomDescription => C128Roms?.Description ?? Roms.Description;
+
+    /// <summary>The machine: a <see cref="C64"/> or a <see cref="C128"/>.</summary>
+    public CommodoreMachine Machine { get; }
+    /// <summary>The machine as a C64, or null.</summary>
+    public C64? C64 => Machine as C64;
+    /// <summary>The machine as a C128, or null.</summary>
+    public C128? C128 => Machine as C128;
+
     public int SampleRate { get; }
     public KeyBindings Bindings { get; set; }
+
+    /// <summary>Which picture to present on a C128 (ignored on a C64).</summary>
+    public DisplayOutput Display { get; set; } = DisplayOutput.Auto;
+
+    /// <summary>True when the frames currently presented come from the VDC.</summary>
+    public bool ShowingVdc => Machine is C128 c128 && Display switch
+    {
+        DisplayOutput.Vdc => true,
+        DisplayOutput.VicII => false,
+        _ => !c128.Display40Columns,
+    };
+
+    /// <summary>The frame that <see cref="RunFrame"/> would present now (for screenshots).</summary>
+    public VideoFrame CurrentFrame => ShowingVdc
+        ? VideoFrame.ForVdc(((C128)Machine).Vdc.Frame, Machine.Frames)
+        : new VideoFrame(Machine.Vic.Frame, Machine.Frames);
 
     /// <summary>Where frames go. Replace at any time (from the emulation thread or while paused).</summary>
     public IVideoSink Video
@@ -74,7 +134,7 @@ public sealed class EmulatorSession
         }
     }
 
-    /// <summary>Raised when a bound key requests a host command (reset, screenshot, pause...).</summary>
+    /// <summary>Raised when a bound key requests a host command (reset, screenshot, pause...). The 40/80 and CAPS LOCK toggles are applied by the session first.</summary>
     public event Action<SystemCommand>? Command;
 
     /// <summary>Human readable description of the currently attached media (for status bars).</summary>
@@ -87,7 +147,7 @@ public sealed class EmulatorSession
     {
         if (Paused) return;
         Machine.RunFrame();
-        _video.PresentFrame(new VideoFrame(Machine.Vic.Frame, Machine.Frames));
+        _video.PresentFrame(CurrentFrame);
         int n = Machine.Audio.Read(_audioScratch);
         if (_warp)
             _audio.Clear();
@@ -141,7 +201,7 @@ public sealed class EmulatorSession
         }
     }
 
-    /// <summary>Presses or releases a C64 key directly (on-screen keyboards).</summary>
+    /// <summary>Presses or releases a key directly (on-screen keyboards).</summary>
     public void SetKey(C64Key key, bool pressed)
     {
         if (pressed) Machine.Keyboard.Press(key); else Machine.Keyboard.Release(key);
@@ -151,7 +211,6 @@ public sealed class EmulatorSession
     public void ReleaseAllInput()
     {
         _held.Clear();
-        _pressedKeys.Clear();
         _shiftHolders = 0;
         Machine.Keyboard.ReleaseAll();
         Machine.Joystick1.Clear();
@@ -160,6 +219,20 @@ public sealed class EmulatorSession
 
     /// <summary>Types text through the KERNAL keyboard buffer.</summary>
     public void TypeText(string text) => Machine.TypeText(text);
+
+    /// <summary>The C128's 40/80 DISPLAY key (a mechanical toggle): true = 40 columns. Always true on a C64.</summary>
+    public bool Display40Columns
+    {
+        get => Machine is not C128 c128 || c128.Display40Columns;
+        set { if (Machine is C128 c128) c128.Display40Columns = value; }
+    }
+
+    /// <summary>The C128's CAPS LOCK key (a mechanical toggle). Always false on a C64.</summary>
+    public bool CapsLock
+    {
+        get => Machine is C128 c128 && c128.CapsLock;
+        set { if (Machine is C128 c128) c128.CapsLock = value; }
+    }
 
     private void Apply(InputAction action, bool pressed)
     {
@@ -187,9 +260,15 @@ public sealed class EmulatorSession
                 break;
             case InputActionKind.System:
                 if (action.Command == SystemCommand.Restore)
+                {
                     Machine.Keyboard.SetRestore(pressed);
+                }
                 else if (pressed)
+                {
+                    if (action.Command == SystemCommand.ToggleColumns) Display40Columns = !Display40Columns;
+                    else if (action.Command == SystemCommand.CapsLock) CapsLock = !CapsLock;
                     Command?.Invoke(action.Command);
+                }
                 break;
         }
     }
@@ -198,15 +277,30 @@ public sealed class EmulatorSession
 
     #region Media
 
-    /// <summary>Attaches a D64 image to the drive (attaching a drive if needed). Optionally autostarts the first file.</summary>
+    /// <summary>
+    /// Attaches a D64 image to the drive (attaching a drive if needed). With <paramref name="autostart"/> the
+    /// first file is loaded and run; a C128 boot disk (CP/M) is started by resetting instead, which makes the
+    /// KERNAL boot it.
+    /// </summary>
     public void AttachDisk(byte[] d64, string name, bool autostart, bool writeProtected = false)
     {
         var drive = Machine.Drive ?? Machine.AttachDrive(8);
         var image = new D64Image(d64);
         drive.InsertDisk(GcrDisk.FromD64(image), writeProtected);
-        MediaDescription = $"Disk: {name} ({image.DiskName.Trim()})";
+        bool bootable = Machine is C128 && IsBootDisk(image);
+        MediaDescription = $"Disk: {name} ({image.DiskName.Trim()}){(bootable ? " [boot disk]" : "")}";
         if (autostart)
-            Machine.AutostartFromDisk("*");
+        {
+            if (bootable) Machine.Reset(hard: false);
+            else Machine.AutostartFromDisk("*");
+        }
+    }
+
+    /// <summary>True when the disk has a C128 boot sector (track 1, sector 0 starting with "CBM").</summary>
+    public static bool IsBootDisk(D64Image image)
+    {
+        var sector = image.GetSector(1, 0);
+        return sector[0] == (byte)'C' && sector[1] == (byte)'B' && sector[2] == (byte)'M';
     }
 
     public void AttachDiskFile(string path, bool autostart) => AttachDisk(File.ReadAllBytes(path), Path.GetFileName(path), autostart);
@@ -253,7 +347,7 @@ public sealed class EmulatorSession
 
     public void AttachProgramFile(string path, int entryIndex = 0, bool run = true) => AttachProgram(File.ReadAllBytes(path), Path.GetFileName(path), entryIndex, run);
 
-    /// <summary>Plugs in a cartridge (raw or CRT) and resets.</summary>
+    /// <summary>Plugs in a cartridge (raw or CRT) and resets (a C128 then starts in C64 mode, as the real one does).</summary>
     public void AttachCartridge(byte[] data, string name)
     {
         var cart = Cartridge.IsCrt(data) ? Cartridge.FromCrt(data, name) : Cartridge.FromRaw(data, name);

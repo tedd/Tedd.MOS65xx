@@ -98,7 +98,7 @@ public partial class SpriteViewerWindow : Window
         var machine = _runner.Session.Machine;
         _runner.Invoke(() =>
         {
-            _snapshot.Update(machine.Vic, machine.Memory.VicBank);
+            _snapshot.Update(machine.Vic, machine.VicBank);
             _frames = machine.Frames;
             _rasterLine = machine.Vic.RasterLine;
             _rasterCycle = machine.Vic.RasterCycle;

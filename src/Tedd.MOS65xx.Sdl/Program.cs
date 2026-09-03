@@ -1,6 +1,8 @@
 using System;
 using System.IO;
+using Tedd.MOS65xx.Emulator.C128;
 using Tedd.MOS65xx.Emulator.C64;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Hosting;
 using static SDL2.SDL;
 
@@ -14,6 +16,9 @@ internal static class Program
         place them next to the executable or in a "roms" sub-directory. Recognised file names (VICE naming):
           basic.901226-01.bin / basic.bin, kernal.901227-03.bin / kernal.bin, characters.901225-01.bin / chargen.bin,
           1541-II.251968-03.bin / dos1541 (or 1541-c000.325302-01.bin + 1541-e000.901229-05.bin).
+        A C128 (--machine c128) additionally needs basic-4000.318018-04.bin + basic-8000.318019-04.bin (or the
+        combined basic.318022-02.bin), kernal.318020-05.bin (or complete.318023-02.bin), characters.390059-01.bin,
+        and the C64 BASIC/KERNAL above; the C128_ROMS variable is checked before C64_ROMS.
         """;
 
     /// <summary>Per-user key bindings file, shared with the other front-ends.</summary>
@@ -40,22 +45,34 @@ internal static class Program
             return 0;
         }
 
-        RomSet roms;
+        bool c128 = options.Machine == "c128";
+        RomSet? roms = null;
+        C128RomSet? roms128 = null;
         try
         {
-            roms = options.RomDirectory is not null
-                ? RomSet.Load(options.RomDirectory)
-                : RomSet.TryLoadDefault() ?? throw new FileNotFoundException("No ROM directory found");
+            if (c128)
+            {
+                roms128 = options.RomDirectory is not null
+                    ? C128RomSet.Load(options.RomDirectory)
+                    : C128RomSet.TryLoadDefault() ?? throw new FileNotFoundException("No C128 ROM directory found");
+                Console.WriteLine($"ROMs: {roms128.Description} ({roms128.Directory})");
+            }
+            else
+            {
+                roms = options.RomDirectory is not null
+                    ? RomSet.Load(options.RomDirectory)
+                    : RomSet.TryLoadDefault() ?? throw new FileNotFoundException("No ROM directory found");
+                Console.WriteLine($"ROMs: {roms.Description} ({roms.Directory})");
+            }
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine("Cannot load the C64 ROMs: " + ex.Message);
+            Console.Error.WriteLine($"Cannot load the {(c128 ? "C128" : "C64")} ROMs: " + ex.Message);
             Console.Error.WriteLine();
             Console.Error.WriteLine(RomHelp);
             return 2;
         }
-        Console.WriteLine($"ROMs: {roms.Description} ({roms.Directory})");
-        if (roms.Drive1541 is null && !options.NoDrive)
+        if ((roms?.Drive1541 ?? roms128?.Drive1541) is null && !options.NoDrive)
             Console.WriteLine("No 1541 ROM found in the ROM directory: the disk drive is unavailable.");
 
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0)
@@ -80,11 +97,14 @@ internal static class Program
             }
 
             string bindingsPath = KeyBindingsPath;
-            var bindings = KeyBindings.LoadOrDefault(bindingsPath);
+            var bindings = File.Exists(bindingsPath) ? KeyBindings.LoadOrDefault(bindingsPath) : KeyBindings.CreateDefault(c128 ? MachineModel.C128 : MachineModel.C64);
             Console.WriteLine($"Key bindings: {bindingsPath}{(File.Exists(bindingsPath) ? "" : " (not found, using defaults)")}");
 
             // The session's sample rate must be the one the audio device actually runs at.
-            var session = new EmulatorSession(roms, audio?.SampleRate ?? options.SampleRate, attachDrive: !options.NoDrive, bindings);
+            int sampleRate = audio?.SampleRate ?? options.SampleRate;
+            var session = roms128 is not null
+                ? new EmulatorSession(roms128, sampleRate, attachDrive: !options.NoDrive, bindings, columns80: options.Columns80)
+                : new EmulatorSession(roms!, sampleRate, attachDrive: !options.NoDrive, bindings);
             var video = new SdlVideoSink();
             session.Video = video;
             if (audio is not null)

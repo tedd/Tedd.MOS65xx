@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Tools;
 using Tedd.MOS65xx.Hosting;
 using static SDL2.SDL;
@@ -16,7 +17,7 @@ namespace Tedd.MOS65xx.Sdl;
 /// </summary>
 internal sealed class SdlHost : IDisposable
 {
-    private const string Title = "Tedd.MOS65xx C64";
+    private const string TitlePrefix = "Tedd.MOS65xx ";
     private const double MinPresentInterval = 1.0 / 60;   // never present faster than this (warp mode)
     private const double StatusInterval = 1.0;
 
@@ -42,12 +43,15 @@ internal sealed class SdlHost : IDisposable
 
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0"); // nearest neighbour: crisp pixels at integer scales
 
-        _window = SDL_CreateWindow(Title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            SdlVideoSink.Width * scale, SdlVideoSink.Height * scale,
+        string title = TitlePrefix + (session.Model == MachineModel.C128 ? "C128" : "C64");
+        // The window is sized for the 40 column picture; the 80 column one gets the same height and twice the width.
+        int windowWidth = (session.ShowingVdc ? Emulator.Video.Vdc8563.FrameWidth : SdlVideoSink.DefaultWidth) * scale;
+        _window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+            windowWidth, SdlVideoSink.DefaultHeight * scale,
             SDL_WindowFlags.SDL_WINDOW_SHOWN | SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL_WindowFlags.SDL_WINDOW_ALLOW_HIGHDPI);
         if (_window == IntPtr.Zero)
             throw new SdlException("SDL_CreateWindow");
-        SDL_SetWindowMinimumSize(_window, SdlVideoSink.Width, SdlVideoSink.Height);
+        SDL_SetWindowMinimumSize(_window, SdlVideoSink.DefaultWidth, SdlVideoSink.DefaultHeight);
 
         // No PRESENTVSYNC: presentation is paced by the emulator's frames (see Run), not by the display.
         _renderer = SDL_CreateRenderer(_window, -1, SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
@@ -56,7 +60,7 @@ internal sealed class SdlHost : IDisposable
         if (_renderer == IntPtr.Zero)
             throw new SdlException("SDL_CreateRenderer");
 
-        _texture = SdlVideoSink.CreateTexture(_renderer);
+        _texture = _video.CreateTexture(_renderer);
         SDL_EventState(SDL_EventType.SDL_DROPFILE, SDL_ENABLE);
 
         _pads = new SdlGameControllers((port, input, pressed) => _runner.Invoke(() => _session.SetJoystick(port, input, pressed)), joyPort);
@@ -89,8 +93,16 @@ internal sealed class SdlHost : IDisposable
             bool fresh = now - lastPresent >= MinPresentInterval && _video.HasNewFrame;
             if (fresh || _needsRedraw)
             {
-                if (fresh)
-                    _video.UploadTo(_texture);
+                if (fresh && _video.Acquire(out bool sizeChanged))
+                {
+                    if (sizeChanged)
+                    {
+                        // The C128 switched between its 40 and 80 column pictures: the texture must match.
+                        SDL_DestroyTexture(_texture);
+                        _texture = _video.CreateTexture(_renderer);
+                    }
+                    _video.Upload(_texture);
+                }
                 Render();
                 lastPresent = now;
                 _needsRedraw = false;
@@ -116,17 +128,16 @@ internal sealed class SdlHost : IDisposable
     private void Render()
     {
         SDL_GetRendererOutputSize(_renderer, out int w, out int h);
-        var dst = FitRect(w, h);
+        var dst = FitRect(w, h, _video.Width, _video.Height);
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
         SDL_RenderClear(_renderer);
         SDL_RenderCopy(_renderer, _texture, IntPtr.Zero, ref dst);
         SDL_RenderPresent(_renderer);
     }
 
-    /// <summary>Largest integer multiple of 384x272 that fits, centred; shrinks proportionally if the output is smaller.</summary>
-    internal static SDL_Rect FitRect(int outputWidth, int outputHeight)
+    /// <summary>Largest integer multiple of the picture that fits, centred; shrinks proportionally if the output is smaller.</summary>
+    internal static SDL_Rect FitRect(int outputWidth, int outputHeight, int sw, int sh)
     {
-        int sw = SdlVideoSink.Width, sh = SdlVideoSink.Height;
         int scale = Math.Min(outputWidth / sw, outputHeight / sh);
         int dw, dh;
         if (scale >= 1)
@@ -288,6 +299,12 @@ internal sealed class SdlHost : IDisposable
             case SystemCommand.MemoryViewer:
                 DumpMemory();
                 break;
+            case SystemCommand.ToggleColumns:
+                Log(_session.Display40Columns ? "40/80 key: 40 columns (VIC-II)" : "40/80 key: 80 columns (VDC)");
+                break;
+            case SystemCommand.CapsLock:
+                Log(_session.CapsLock ? "CAPS LOCK on" : "CAPS LOCK off");
+                break;
         }
     }
 
@@ -295,10 +312,17 @@ internal sealed class SdlHost : IDisposable
     {
         try
         {
-            int w = SdlVideoSink.Width, h = SdlVideoSink.Height;
-            var pixels = new uint[w * h];
-            // Under the runner lock the machine is between frames, so Vic.Frame is a complete picture.
-            _runner.Invoke(() => new VideoFrame(_session.Machine.Vic.Frame, _session.Machine.Frames).CopyVisible(pixels));
+            int w = 0, h = 0;
+            uint[] pixels = Array.Empty<uint>();
+            // Under the runner lock the machine is between frames, so the frame buffer is a complete picture.
+            _runner.Invoke(() =>
+            {
+                var frame = _session.CurrentFrame;
+                w = frame.Width;
+                h = frame.Height;
+                pixels = new uint[w * h];
+                frame.CopyVisible(pixels);
+            });
 
             string dir = AppContext.BaseDirectory;
             string path;
@@ -323,13 +347,13 @@ internal sealed class SdlHost : IDisposable
         {
             var m = _session.Machine;
             var cpu = m.Cpu;
-            var ram = m.Memory.Ram;
+            var ram = m.Ram;
             string flags = new(new[]
             {
                 cpu.FlagNegative ? 'N' : '.', cpu.FlagOverflow ? 'V' : '.', '-', '.',
                 cpu.FlagDecimal ? 'D' : '.', cpu.FlagInterrupt ? 'I' : '.', cpu.FlagZero ? 'Z' : '.', cpu.FlagCarry ? 'C' : '.',
             });
-            sb.AppendLine($"6510: PC=${cpu.PC:X4} A=${cpu.A:X2} X=${cpu.X:X2} Y=${cpu.Y:X2} S=${cpu.S:X2} P=${cpu.P:X2} [{flags}]  " +
+            sb.AppendLine($"{(m.Model == MachineModel.C128 ? "8502" : "6510")}: PC=${cpu.PC:X4} A=${cpu.A:X2} X=${cpu.X:X2} Y=${cpu.Y:X2} S=${cpu.S:X2} P=${cpu.P:X2} [{flags}]  " +
                           $"cycles={m.Cycles} frame={m.Frames} raster={m.Vic.RasterLine} screen=${m.ScreenAddress:X4}");
             if (m.Drive is { } drive)
                 sb.AppendLine($"1541: PC=${drive.Cpu.PC:X4} A=${drive.Cpu.A:X2} X=${drive.Cpu.X:X2} Y=${drive.Cpu.Y:X2} " +

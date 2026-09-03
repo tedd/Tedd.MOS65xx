@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
+using Tedd.MOS65xx.Emulator.C128;
 using Tedd.MOS65xx.Emulator.C64;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Video;
 using Tedd.MOS65xx.Hosting;
 
@@ -22,18 +24,29 @@ public sealed class C64Bridge
 {
     public const int DefaultSampleRate = 44100;
 
-    private static readonly double FrameSeconds = 1.0 / C64.FrameRate;
+    private static readonly double FrameSeconds = 1.0 / CommodoreMachine.FrameRate;
 
     private readonly FrameStore _frames;
     private readonly AudioRing _audio;
     private double _accumulator;
     private int _maxFramesPerUpdate = 3;
 
-    /// <summary>Creates a bridge around a ROM set (with a 1541 drive when the set contains a drive ROM).</summary>
+    /// <summary>Creates a bridge around a C64 ROM set (with a 1541 drive when the set contains a drive ROM).</summary>
     public C64Bridge(RomSet roms, int sampleRate = DefaultSampleRate)
+        : this(new EmulatorSession(roms ?? throw new ArgumentNullException(nameof(roms)), sampleRate))
     {
-        if (roms is null) throw new ArgumentNullException(nameof(roms));
-        Session = new EmulatorSession(roms, sampleRate);
+    }
+
+    /// <summary>Creates a bridge around a C128 ROM set; <paramref name="columns80"/> boots on the 80 column VDC screen.</summary>
+    public C64Bridge(C128RomSet roms, int sampleRate = DefaultSampleRate, bool columns80 = false)
+        : this(new EmulatorSession(roms ?? throw new ArgumentNullException(nameof(roms)), sampleRate, columns80: columns80))
+    {
+    }
+
+    private C64Bridge(EmulatorSession session)
+    {
+        Session = session;
+        int sampleRate = session.SampleRate;
         _frames = new FrameStore();
         _audio = new AudioRing(sampleRate, Math.Max(1024, sampleRate / 4));
         Session.Video = _frames;
@@ -55,14 +68,34 @@ public sealed class C64Bridge
     /// <summary>The underlying session (for anything the facade does not expose).</summary>
     public EmulatorSession Session { get; }
 
-    /// <summary>The machine itself (memory, chips, drive) for debuggers and tooling.</summary>
-    public C64 Machine => Session.Machine;
+    /// <summary>The machine itself (memory, chips, drive) for debuggers and tooling: a <see cref="C64"/> or a <see cref="C128"/>.</summary>
+    public CommodoreMachine Machine => Session.Machine;
 
-    /// <summary>Width of the picture produced by the copy methods (384).</summary>
-    public int FrameWidth => VicII.VisibleArea.Width;
+    /// <summary>The machine model.</summary>
+    public MachineModel Model => Session.Model;
+
+    /// <summary>
+    /// Width of the picture produced by the copy methods: 384 for the VIC-II, 768 when a C128 shows its VDC screen.
+    /// It can change between frames on a C128 (40/80 key), so size textures from it after <see cref="Update"/>.
+    /// </summary>
+    public int FrameWidth => _frames.Width;
 
     /// <summary>Height of the picture produced by the copy methods (272).</summary>
-    public int FrameHeight => VicII.VisibleArea.Height;
+    public int FrameHeight => _frames.Height;
+
+    /// <summary>Which picture a C128 shows (ignored on a C64).</summary>
+    public DisplayOutput Display
+    {
+        get => Session.Display;
+        set => Session.Display = value;
+    }
+
+    /// <summary>The C128's 40/80 DISPLAY key (true = 40 columns); always true on a C64.</summary>
+    public bool Display40Columns
+    {
+        get => Session.Display40Columns;
+        set => Session.Display40Columns = value;
+    }
 
     /// <summary>Sample rate of the audio delivered by <see cref="ReadAudio"/>.</summary>
     public int AudioSampleRate => Session.SampleRate;
@@ -263,19 +296,25 @@ public sealed class C64Bridge
 
     #endregion
 
-    /// <summary>Keeps a copy of the visible area of the last presented frame.</summary>
+    /// <summary>Keeps a copy of the visible area of the last presented frame (its size follows the frame).</summary>
     private sealed class FrameStore : IVideoSink
     {
-        private readonly int _width = VicII.VisibleArea.Width;
-        private readonly int _height = VicII.VisibleArea.Height;
-        private readonly uint[] _argb;
+        private int _width = VicII.VisibleArea.Width;
+        private int _height = VicII.VisibleArea.Height;
+        private uint[] _argb;
 
-        public FrameStore() => _argb = new uint[_width * _height];
+        public FrameStore() => _argb = new uint[Vdc8563.FrameWidth * Vdc8563.FrameHeight];
 
         public long FrameNumber { get; private set; }
+        public int Width => _width;
+        public int Height => _height;
 
         public void PresentFrame(in VideoFrame frame)
         {
+            if (_argb.Length < frame.Width * frame.Height)
+                _argb = new uint[frame.Width * frame.Height];
+            _width = frame.Width;
+            _height = frame.Height;
             frame.CopyVisible(_argb);
             FrameNumber = frame.FrameNumber;
         }
@@ -307,7 +346,7 @@ public sealed class C64Bridge
                 throw new ArgumentException($"Destination must hold at least {_width * _height} pixels", nameof(destination));
             if (!flip)
             {
-                Array.Copy(_argb, destination, _argb.Length);
+                Array.Copy(_argb, destination, _width * _height);
                 return;
             }
             for (int y = 0; y < _height; y++)

@@ -121,6 +121,9 @@ select { padding: 0.15rem 0.3rem; }
 /* ---------- emulator */
 
 .emu { display: flex; flex-direction: column; gap: 0.7rem; }
+.emu-machine { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1rem; }
+.emu-machine .spacer { flex: 1; }
+.roms h4 { margin: 0.8rem 0 0.3rem; font-size: 0.95rem; }
 .emu.drop-hover .emu-screen { outline: 3px dashed var(--accent-2); }
 
 .emu-screen {

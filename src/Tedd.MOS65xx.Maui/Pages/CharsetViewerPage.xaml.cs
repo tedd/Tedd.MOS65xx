@@ -59,7 +59,7 @@ public partial class CharsetViewerPage : ContentPage
     {
         InitializeComponent();
         _runner = runner;
-        var roms = runner.Session.Machine.Roms;
+        var roms = runner.Session.Roms;
         _originalRom = (byte[])roms.Char.Clone();
         _charRomName = CharRomName(roms.Description);
         NotesText.Text = Notes;
@@ -201,7 +201,7 @@ public partial class CharsetViewerPage : ContentPage
             _runner.Invoke(() =>
             {
                 var machine = _runner.Session.Machine;
-                bank = machine.Memory.VicBank;
+                bank = machine.VicBank;
                 d018 = machine.Vic.Peek(0x18);
                 captured = CharacterSet.FromVic(machine.Vic, bank);
             });
@@ -215,7 +215,7 @@ public partial class CharsetViewerPage : ContentPage
         {
             byte[] image = _source == ViewSource.File
                 ? _file ?? Array.Empty<byte>()
-                : _runner.Invoke(() => (byte[])_runner.Session.Machine.Roms.Char.Clone());
+                : _runner.Invoke(() => (byte[])_runner.Session.Roms.Char.Clone());
             if (image.Length == 0) return;
             var (offset, length) = Slice(image.Length);
             _setOffset = offset;
@@ -437,7 +437,7 @@ public partial class CharsetViewerPage : ContentPage
         int offset = image.Length == CharacterSet.RomSize || _setChoice != ViewSet.Set2 ? 0 : CharacterSet.LowercaseSetOffset;
         try
         {
-            _runner.Invoke(() => _runner.Session.Machine.Roms.ReplaceChar(image, offset));
+            _runner.Invoke(() => _runner.Session.Roms.ReplaceChar(image, offset));
         }
         catch (Exception ex)
         {
@@ -456,7 +456,7 @@ public partial class CharsetViewerPage : ContentPage
 
     private void Restore_Clicked(object? sender, EventArgs e)
     {
-        _runner.Invoke(() => _runner.Session.Machine.Roms.ReplaceChar(_originalRom));
+        _runner.Invoke(() => _runner.Session.Roms.ReplaceChar(_originalRom));
         _appliedName = null;
         RestoreButton.IsEnabled = false;
         StatusText.Text = "Character ROM restored to what it was when this window was opened.";

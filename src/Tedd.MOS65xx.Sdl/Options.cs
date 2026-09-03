@@ -7,6 +7,10 @@ namespace Tedd.MOS65xx.Sdl;
 internal sealed class Options
 {
     public string? RomDirectory;
+    /// <summary>"c64" (default) or "c128".</summary>
+    public string Machine = "c64";
+    /// <summary>C128: start with the 40/80 DISPLAY key down (80 columns on the VDC).</summary>
+    public bool Columns80;
     public string? Disk;
     public string? Tape;
     public string? Cartridge;
@@ -23,7 +27,9 @@ internal sealed class Options
     public const string Usage = """
         Usage: Tedd.MOS65xx.Sdl [options] [file ...]
 
-          --roms <dir>        directory with the C64 ROM images (default: C64_ROMS env var, the executable's
+          --machine <c64|c128> the computer to emulate (default c64)
+          --80                C128: press the 40/80 DISPLAY key, i.e. boot on the 80 column VDC screen
+          --roms <dir>        directory with the ROM images (default: C64_ROMS / C128_ROMS env var, the executable's
                               directory, the current directory or a "roms" sub-directory of their ancestors)
           --disk <file.d64>   insert a disk image into drive 8
           --tape <file>       load a program from a .t64 tape image or a .prg file (injected into memory)
@@ -66,6 +72,11 @@ internal sealed class Options
             switch (a.ToLowerInvariant())
             {
                 case "--roms": o.RomDirectory = Next(); break;
+                case "--machine":
+                    o.Machine = Next().ToLowerInvariant();
+                    if (o.Machine is not ("c64" or "c128")) throw new ArgumentException($"--machine expects c64 or c128, got '{o.Machine}'");
+                    break;
+                case "--80": o.Columns80 = true; break;
                 case "--disk": o.Disk = Next(); break;
                 case "--tape": o.Tape = Next(); break;
                 case "--cart": o.Cartridge = Next(); break;

@@ -8,8 +8,8 @@
             <Separator />
             <TextBlock Text="Source:" VerticalAlignment="Center" Margin="4,0" />
             <ComboBox x:Name="SourceBox" Width="190" SelectionChanged="Source_Changed">
-                <ComboBoxItem Content="CPU view (as the 6510 sees it)" IsSelected="True" />
-                <ComboBoxItem Content="RAM (64K)" />
+                <ComboBoxItem Content="CPU view (as the 6510/8502 sees it)" IsSelected="True" />
+                <ComboBoxItem Content="RAM (64K; C128: both banks)" />
                 <ComboBoxItem Content="Color RAM ($D800)" />
                 <ComboBoxItem Content="VIC-II view (16K bank)" />
                 <ComboBoxItem Content="1541 RAM (2K)" />

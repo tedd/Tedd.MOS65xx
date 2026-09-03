@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using Tedd.MOS65xx.Emulator.C64;
 using Tedd.MOS65xx.Emulator.Cpu;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Media;
 using Tedd.MOS65xx.Hosting;
 
@@ -50,7 +51,7 @@ public partial class MemoryViewerPage : ContentPage
         OnFreezeChanged();
     }
 
-    private C64 Machine => _runner.Session.Machine;
+    private CommodoreMachine Machine => _runner.Session.Machine;
 
     /// <summary>Called by the main window when the pause state changes elsewhere.</summary>
     public void OnFreezeChanged()
@@ -142,16 +143,16 @@ public partial class MemoryViewerPage : ContentPage
         switch (_source)
         {
             case MemorySource.Cpu:
-                for (int i = 0; i < data.Length; i++) data[i] = m.Memory.Peek((ushort)i);
+                for (int i = 0; i < data.Length; i++) data[i] = m.PeekMemory((ushort)i);
                 break;
             case MemorySource.Ram:
-                Array.Copy(m.Memory.Ram, data, data.Length);
+                Array.Copy(m.Ram, data, Math.Min(data.Length, m.Ram.Length));
                 break;
             case MemorySource.ColorRam:
-                Array.Copy(m.Memory.ColorRam, data, data.Length);
+                Array.Copy(m.ColorRam, data, Math.Min(data.Length, m.ColorRam.Length));
                 break;
             case MemorySource.Vic:
-                for (int i = 0; i < data.Length; i++) data[i] = m.Memory.ReadVic(i);
+                for (int i = 0; i < data.Length; i++) data[i] = m.VicMemory.PeekVic(i);
                 break;
             case MemorySource.DriveRam:
                 if (m.Drive is { } d) Array.Copy(d.Memory.Ram, data, data.Length);
@@ -170,10 +171,10 @@ public partial class MemoryViewerPage : ContentPage
             var m = Machine;
             switch (_source)
             {
-                case MemorySource.Cpu: m.Memory.Write((ushort)address, value); break;
-                case MemorySource.Ram: m.Memory.Ram[address & 0xFFFF] = value; break;
-                case MemorySource.ColorRam: m.Memory.ColorRam[address & 0x3FF] = (byte)(value & 0x0F); break;
-                case MemorySource.Vic: m.Memory.Ram[((m.Memory.VicBank << 14) | (address & 0x3FFF)) & 0xFFFF] = value; break;
+                case MemorySource.Cpu: m.WriteMemory((ushort)address, value); break;
+                case MemorySource.Ram: if (address < m.Ram.Length) m.Ram[address] = value; break;
+                case MemorySource.ColorRam: m.ColorRam[address & 0x3FF] = (byte)(value & 0x0F); break;
+                case MemorySource.Vic: m.Ram[((m.VicBank << 14) | (address & 0x3FFF)) & 0xFFFF] = value; break;
                 case MemorySource.DriveRam: if (m.Drive is { } d) d.Memory.Ram[address & 0x7FF] = value; break;
                 case MemorySource.DriveCpu: if (m.Drive is { } d2) d2.Memory.Write((ushort)address, value); break;
             }
@@ -208,7 +209,7 @@ public partial class MemoryViewerPage : ContentPage
         }
         else
         {
-            read = a => Machine.Memory.Peek(a);
+            read = a => Machine.PeekMemory(a);
             pc = Machine.Cpu.PC;
         }
         for (int i = 0; i < 12; i++)
@@ -225,7 +226,10 @@ public partial class MemoryViewerPage : ContentPage
         var m = Machine;
         var sb = new StringBuilder();
         sb.Append($"Frame {m.Frames}  Raster {m.Vic.RasterLine}/{m.Vic.RasterCycle}  Cycles {m.Cycles:N0}\n");
-        sb.Append($"$01 = ${m.Memory.PortData:X2} (DDR ${m.Memory.PortDdr:X2})  VIC bank {m.Memory.VicBank}  Screen ${m.ScreenAddress:X4}\n");
+        if (m is C64 c64)
+            sb.Append($"$01 = ${c64.Memory.PortData:X2} (DDR ${c64.Memory.PortDdr:X2})  VIC bank {m.VicBank}  Screen ${m.ScreenAddress:X4}\n");
+        else
+            sb.Append($"VIC bank {m.VicBank}  Screen ${m.ScreenAddress:X4}\n");
         sb.Append($"IEC ATN {(m.Iec.AtnLow ? "L" : "H")} CLK {(m.Iec.ClkLow ? "L" : "H")} DATA {(m.Iec.DataLow ? "L" : "H")}\n");
         if (m.Drive is { } d)
             sb.Append($"1541: track {d.Disk.Track:0.#} motor {(d.MotorOn ? "on" : "off")} LED {(d.Led ? "on" : "off")} PC ${d.Cpu.PC:X4}\n");

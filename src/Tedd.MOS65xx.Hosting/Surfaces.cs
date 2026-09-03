@@ -3,52 +3,85 @@ using Tedd.MOS65xx.Emulator.Video;
 
 namespace Tedd.MOS65xx.Hosting;
 
+/// <summary>Which video chip produced a <see cref="VideoFrame"/>.</summary>
+public enum VideoSource
+{
+    /// <summary>The VIC-II (40 column) picture: 504 x 312 raster, 384 x 272 visible.</summary>
+    VicII,
+    /// <summary>The C128's VDC (80 column) picture: 768 x 272, all of it visible.</summary>
+    Vdc,
+}
+
 /// <summary>
-/// One rendered PAL frame. The pixel buffer is owned by the emulator and reused for the next frame, so sinks
-/// must copy what they need before returning from <see cref="IVideoSink.PresentFrame"/>.
+/// One rendered frame. The pixel buffer is owned by the emulator and reused for the next frame, so sinks must
+/// copy what they need before returning from <see cref="IVideoSink.PresentFrame"/>. The geometry travels with
+/// the frame: a C128 session switches between the VIC-II's 384 x 272 picture and the VDC's 768 x 272 one, so
+/// sinks should size their target from <see cref="Width"/>/<see cref="Height"/> rather than assume the C64's.
 /// </summary>
 public readonly struct VideoFrame
 {
+    /// <summary>A VIC-II frame (the C64 geometry).</summary>
     public VideoFrame(uint[] pixels, long frameNumber)
+        : this(pixels, frameNumber, VideoSource.VicII, VicII.FrameWidth, VicII.FrameHeight,
+            VicII.VisibleArea.X, VicII.VisibleArea.Y, VicII.VisibleArea.Width, VicII.VisibleArea.Height)
+    {
+    }
+
+    public VideoFrame(uint[] pixels, long frameNumber, VideoSource source, int fullWidth, int fullHeight, int visibleX, int visibleY, int visibleWidth, int visibleHeight)
     {
         Pixels = pixels;
         FrameNumber = frameNumber;
+        Source = source;
+        FullWidth = fullWidth;
+        FullHeight = fullHeight;
+        VisibleX = visibleX;
+        VisibleY = visibleY;
+        Width = visibleWidth;
+        Height = visibleHeight;
     }
 
-    /// <summary>Full raster (504 x 312) ARGB pixels, 0xAARRGGBB with alpha = 0xFF.</summary>
+    /// <summary>A VDC frame (the whole 768 x 272 buffer is visible).</summary>
+    public static VideoFrame ForVdc(uint[] pixels, long frameNumber) =>
+        new(pixels, frameNumber, VideoSource.Vdc, Vdc8563.FrameWidth, Vdc8563.FrameHeight, 0, 0, Vdc8563.FrameWidth, Vdc8563.FrameHeight);
+
+    /// <summary>Full raster ARGB pixels, 0xAARRGGBB with alpha = 0xFF, <see cref="FullWidth"/> x <see cref="FullHeight"/>.</summary>
     public uint[] Pixels { get; }
     /// <summary>Frame counter since power-on.</summary>
     public long FrameNumber { get; }
+    /// <summary>The chip that produced the frame.</summary>
+    public VideoSource Source { get; }
     /// <summary>Width of the full raster buffer.</summary>
-    public int FullWidth => VicII.FrameWidth;
+    public int FullWidth { get; }
     /// <summary>Height of the full raster buffer.</summary>
-    public int FullHeight => VicII.FrameHeight;
-    /// <summary>Width of the standard visible PAL picture (384).</summary>
-    public int Width => VicII.VisibleArea.Width;
-    /// <summary>Height of the standard visible PAL picture (272).</summary>
-    public int Height => VicII.VisibleArea.Height;
+    public int FullHeight { get; }
+    /// <summary>Left edge of the visible picture inside the buffer.</summary>
+    public int VisibleX { get; }
+    /// <summary>Top edge of the visible picture inside the buffer.</summary>
+    public int VisibleY { get; }
+    /// <summary>Width of the visible picture (384 for the VIC-II, 768 for the VDC).</summary>
+    public int Width { get; }
+    /// <summary>Height of the visible picture (272).</summary>
+    public int Height { get; }
 
     /// <summary>Copies the visible picture (Width x Height, top-left first) into <paramref name="destination"/>.</summary>
     public void CopyVisible(Span<uint> destination)
     {
-        var vis = VicII.VisibleArea;
-        if (destination.Length < vis.Width * vis.Height)
+        if (destination.Length < Width * Height)
             throw new ArgumentException("Destination too small", nameof(destination));
-        for (int y = 0; y < vis.Height; y++)
-            Pixels.AsSpan((vis.Y + y) * VicII.FrameWidth + vis.X, vis.Width).CopyTo(destination.Slice(y * vis.Width, vis.Width));
+        for (int y = 0; y < Height; y++)
+            Pixels.AsSpan((VisibleY + y) * FullWidth + VisibleX, Width).CopyTo(destination.Slice(y * Width, Width));
     }
 
     /// <summary>Copies the visible picture as RGBA bytes (R, G, B, A order, as used by browser canvases and most GPU textures).</summary>
     public void CopyVisibleRgba(Span<byte> destination)
     {
-        var vis = VicII.VisibleArea;
-        if (destination.Length < vis.Width * vis.Height * 4)
+        if (destination.Length < Width * Height * 4)
             throw new ArgumentException("Destination too small", nameof(destination));
         int o = 0;
-        for (int y = 0; y < vis.Height; y++)
+        for (int y = 0; y < Height; y++)
         {
-            int src = (vis.Y + y) * VicII.FrameWidth + vis.X;
-            for (int x = 0; x < vis.Width; x++)
+            int src = (VisibleY + y) * FullWidth + VisibleX;
+            for (int x = 0; x < Width; x++)
             {
                 uint p = Pixels[src + x];
                 destination[o++] = (byte)(p >> 16);
@@ -62,14 +95,13 @@ public readonly struct VideoFrame
     /// <summary>Copies the visible picture as BGRA bytes (little-endian ARGB, as used by WPF/Direct3D/SDL ARGB8888).</summary>
     public void CopyVisibleBgra(Span<byte> destination)
     {
-        var vis = VicII.VisibleArea;
-        if (destination.Length < vis.Width * vis.Height * 4)
+        if (destination.Length < Width * Height * 4)
             throw new ArgumentException("Destination too small", nameof(destination));
         int o = 0;
-        for (int y = 0; y < vis.Height; y++)
+        for (int y = 0; y < Height; y++)
         {
-            int src = (vis.Y + y) * VicII.FrameWidth + vis.X;
-            for (int x = 0; x < vis.Width; x++)
+            int src = (VisibleY + y) * FullWidth + VisibleX;
+            for (int x = 0; x < Width; x++)
             {
                 uint p = Pixels[src + x];
                 destination[o++] = (byte)p;

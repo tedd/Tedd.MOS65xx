@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Tedd.MOS65xx.Emulator.C128;
 using Tedd.MOS65xx.Emulator.C64;
+using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Tools;
 using Tedd.MOS65xx.Hosting;
 using Tedd.MOS65xx.Web.Demo;
@@ -11,8 +13,8 @@ using Tedd.MOS65xx.Web.Services;
 namespace Tedd.MOS65xx.Web.Components;
 
 /// <summary>
-/// The interactive emulator: canvas + audio + keyboard/touch input + media and ROM handling.
-/// The pieces it glues together are reusable on their own: <see cref="BrowserVideoSink"/>,
+/// The interactive emulator: canvas + audio + keyboard/touch input + media and ROM handling, for a Commodore 64
+/// or a Commodore 128. The pieces it glues together are reusable on their own: <see cref="BrowserVideoSink"/>,
 /// <see cref="BrowserAudioSink"/>, <see cref="BrowserInput"/>, <see cref="BrowserLoop"/> and <see cref="RomStore"/>.
 /// </summary>
 public partial class Emulator : ComponentBase, IDisposable
@@ -20,6 +22,7 @@ public partial class Emulator : ComponentBase, IDisposable
     private const string CanvasId = "emu-canvas";
     private const string ScreenId = "emu-screen";
     private const string RootId = "emu-root";
+    private const string MachineKey = "tedd.mos65xx.machine";
     private const long MaxMediaSize = 8 * 1024 * 1024;
     private const long MaxRomSize = 64 * 1024;
 
@@ -29,6 +32,20 @@ public partial class Emulator : ComponentBase, IDisposable
     {
         ("RUN/STOP", C64Key.RunStop), ("RETURN", C64Key.Return), ("SPACE", C64Key.Space),
         ("F1", C64Key.F1), ("F3", C64Key.F3), ("F5", C64Key.F5), ("F7", C64Key.F7),
+    };
+
+    private static readonly (string Label, C64Key Key)[] SoftKeys128 =
+    {
+        ("ESC", C64Key.Escape), ("TAB", C64Key.Tab), ("HELP", C64Key.Help), ("ALT", C64Key.Alt),
+    };
+
+    /// <summary>The CP/M disks shipped with the site (disks/c128 in the repository).</summary>
+    private static readonly (string Label, string File)[] CpmDisks =
+    {
+        ("CP/M 3.0 system (1985)", "cpm.system.622-580745.d64"),
+        ("CP/M 3.0 system (1987)", "cpm.system.622-3282252.d64"),
+        ("CP/M utilities (1985)", "cpm.utilities.d64"),
+        ("CP/M utilities (1987)", "cpm.utilities3.d64"),
     };
 
     [Inject] private HttpClient Http { get; set; } = default!;
@@ -59,6 +76,9 @@ public partial class Emulator : ComponentBase, IDisposable
     private string _typeText = "";
     private int _joyPort = 2;
     private bool _statusHooked;
+    private MachineModel _model = MachineModel.C64;
+    private bool _columns80;
+    private DisplayOutput _display = DisplayOutput.Auto;
 
     public Emulator()
     {
@@ -66,6 +86,8 @@ public partial class Emulator : ComponentBase, IDisposable
     }
 
     private bool IsRunning => _state == EmuState.Running && _session is not null;
+    private bool IsC128 => _model == MachineModel.C128;
+    private bool RomsReadyForModel => IsC128 ? _roms.IsC128Complete : _roms.IsComplete;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -79,6 +101,7 @@ public partial class Emulator : ComponentBase, IDisposable
             C64Js.AttachDrop(RootId, _onDroppedFile);
             BrowserLoop.StatusTick += OnStatusTick;
             _statusHooked = true;
+            if (C64Js.StorageGet(MachineKey) == "c128") _model = MachineModel.C128;
             _bootMessage = "looking for ROM images";
             StateHasChanged();
             await LoadRomsAsync();
@@ -95,6 +118,7 @@ public partial class Emulator : ComponentBase, IDisposable
     {
         bool found = _roms.LoadFromStorage() || await _roms.LoadFromSiteAsync(Http);
         _attachDrive = _roms.HasDrive;
+        if (IsC128 && !_roms.IsC128Complete) _model = MachineModel.C64;   // the remembered C128 choice needs its ROMs
         _state = found ? EmuState.Ready : EmuState.NeedRoms;
         _showRoms = !found;
     }
@@ -105,15 +129,16 @@ public partial class Emulator : ComponentBase, IDisposable
     {
         try
         {
-            if (!_roms.IsComplete)
+            if (!RomsReadyForModel)
             {
                 _state = EmuState.NeedRoms;
+                _showRoms = true;
                 return;
             }
             // Must happen in the click handler (browser autoplay policy); returns the real device rate.
             _sampleRate = await C64Js.AudioStart();
             _audioState = C64Js.AudioState();
-            if (_session is null || _session.SampleRate != _sampleRate)
+            if (_session is null || _session.SampleRate != _sampleRate || _session.Model != _model)
                 CreateSession();
             _state = EmuState.Running;
             _error = null;
@@ -127,7 +152,7 @@ public partial class Emulator : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>(Re)creates the session from the current ROM set and connects the browser surfaces.</summary>
+    /// <summary>(Re)creates the session from the current ROM set and machine choice and connects the browser surfaces.</summary>
     private void CreateSession()
     {
         if (_session is not null)
@@ -136,7 +161,10 @@ public partial class Emulator : ComponentBase, IDisposable
             _input.Detach();
         }
         bool drive = _attachDrive && _roms.HasDrive;
-        var session = new EmulatorSession(_roms.ToRomSet(drive), _sampleRate, attachDrive: drive);
+        var session = IsC128
+            ? new EmulatorSession(_roms.ToC128RomSet(drive), _sampleRate, attachDrive: drive, columns80: _columns80)
+            : new EmulatorSession(_roms.ToRomSet(drive), _sampleRate, attachDrive: drive);
+        session.Display = _display;
         _audio = new BrowserAudioSink(_sampleRate);
         session.Audio = _audio;
         session.Video = _video!;
@@ -156,6 +184,7 @@ public partial class Emulator : ComponentBase, IDisposable
             case SystemCommand.Pause: _ = TogglePauseAsync(); break;
             case SystemCommand.Warp: ToggleWarp(); break;
             case SystemCommand.Screenshot: Screenshot(); break;
+            case SystemCommand.ToggleColumns: _columns80 = !(_session?.Display40Columns ?? true); break;
         }
         _ = InvokeAsync(StateHasChanged);
     }
@@ -183,6 +212,53 @@ public partial class Emulator : ComponentBase, IDisposable
         _input.Detach();
         if (_session is not null) _session.Command -= OnCommand;
     }
+
+    #endregion
+
+    #region machine choice
+
+    private void SelectMachine(MachineModel model)
+    {
+        if (model == _model) return;
+        if (model == MachineModel.C128 && !_roms.IsC128Complete)
+        {
+            _message = "The C128 needs its own ROM images (BASIC low/high, KERNAL, 8K character ROM) plus the C64 BASIC/KERNAL: load them in the ROM panel.";
+            _showRoms = true;
+            return;
+        }
+        _model = model;
+        C64Js.StorageSet(MachineKey, model == MachineModel.C128 ? "c128" : "c64");
+        if (_state == EmuState.Running)
+        {
+            CreateSession();
+            BrowserLoop.ResetPacing();
+            _message = $"Switched to the Commodore {(IsC128 ? "128" : "64")}.";
+            FocusScreen();
+        }
+        else if (_state is EmuState.Ready or EmuState.NeedRoms)
+        {
+            _state = RomsReadyForModel ? EmuState.Ready : EmuState.NeedRoms;
+        }
+    }
+
+    /// <summary>Presses/releases the 40/80 DISPLAY key (the KERNAL looks at it on reset and on ESC X).</summary>
+    private void ToggleColumns()
+    {
+        _columns80 = !_columns80;
+        if (_session is not null) _session.Display40Columns = !_columns80;
+        FocusScreen();
+    }
+
+    private void SetDisplay(DisplayOutput display)
+    {
+        _display = display;
+        if (_session is not null) _session.Display = display;
+        FocusScreen();
+    }
+
+    private string CpuLabel => _session?.Machine is C128 c
+        ? (c.C64Mode ? "C64 mode" : c.Z80Active ? "Z80" : "8502") + (c.Vic.FastMode ? " 2 MHz" : "")
+        : "6510";
 
     #endregion
 
@@ -220,13 +296,18 @@ public partial class Emulator : ComponentBase, IDisposable
         if (!_session.Warp) BrowserLoop.ResetPacing();
     }
 
-    private void Screenshot() => C64Js.DownloadCanvas(CanvasId, $"c64-{DateTime.Now:yyyyMMdd-HHmmss}.png");
+    private void Screenshot() => C64Js.DownloadCanvas(CanvasId, $"{(IsC128 ? "c128" : "c64")}-{DateTime.Now:yyyyMMdd-HHmmss}.png");
 
     private void Fullscreen() => C64Js.RequestFullscreen(ScreenId);
 
     private void RunDemo()
     {
         if (_session is null) return;
+        if (IsC128)
+        {
+            _message = "The tech demo is written for the C64: switch the machine to Commodore 64 (or type GO64 on the C128) to run it.";
+            return;
+        }
         try
         {
             var prg = DemoProgram.BuildPrg();
@@ -239,6 +320,33 @@ public partial class Emulator : ComponentBase, IDisposable
         catch (AssemblerException ex)
         {
             _message = $"Assembler error in line {ex.Line}: {ex.Message}";
+        }
+    }
+
+    /// <summary>Fetches one of the shipped CP/M disks, presses the 40/80 key for the 80 column screen and boots it.</summary>
+    private async Task BootCpmAsync(string file)
+    {
+        if (_session is null || !IsC128) return;
+        if (!_roms.HasDrive || !_attachDrive)
+        {
+            _message = "CP/M boots from the 1541: the drive ROM is needed and the drive must be enabled.";
+            return;
+        }
+        try
+        {
+            using var response = await Http.GetAsync("disks/c128/" + file);
+            response.EnsureSuccessStatusCode();
+            var data = await response.Content.ReadAsByteArrayAsync();
+            _columns80 = true;
+            _session.Display40Columns = false;
+            _session.AttachDisk(data, file, autostart: true, writeProtected: true);
+            _session.Warp = true;   // the 1541 needs about two minutes of C128 time to load CPM+.SYS
+            _message = $"Booting {file} on the 80 column screen (warp is on until you turn it off; the load takes about two minutes of emulated time).";
+            FocusScreen();
+        }
+        catch (Exception ex)
+        {
+            _message = $"Could not load {file}: {ex.Message}";
         }
     }
 
@@ -290,7 +398,7 @@ public partial class Emulator : ComponentBase, IDisposable
     {
         var data = C64Js.TakeDroppedFile(name);
         if (data is null) return;
-        if (ClassifyRom(name, data.Length) is { } slot)
+        if (RomStore.Classify(name, data.Length) is { } slot)
         {
             _romMessage = _roms.Accept(slot, name, data);
             _showRoms = true;
@@ -324,20 +432,6 @@ public partial class Emulator : ComponentBase, IDisposable
         }
     }
 
-    /// <summary>Recognises ROM dumps by size and name so they can be dropped anywhere on the emulator.</summary>
-    private static RomSlot? ClassifyRom(string name, int size)
-    {
-        var n = name.ToLowerInvariant();
-        bool romish = n.EndsWith(".bin") || n.EndsWith(".rom") || !n.Contains('.');
-        if (!romish) return null;
-        if (size == RomSet.CharSize && (n.Contains("char") || n.Contains("901225") || n.Contains("325018"))) return RomSlot.Chargen;
-        if (size == RomSet.BasicSize && (n.Contains("basic") || n.Contains("901226"))) return RomSlot.Basic;
-        if (size == RomSet.KernalSize && (n.Contains("kernal") || n.Contains("kernel") || n.Contains("901227"))) return RomSlot.Kernal;
-        if (size is 8192 or 16384 && (n.Contains("1541") || n.Contains("1540") || n.Contains("dos") || n.Contains("325302") || n.Contains("901229"))) return RomSlot.Drive;
-        if (size == 16384 && (n.Contains("64c") || n.Contains("251913") || n.Contains("basic+kernal"))) return RomSlot.Combined;
-        return null;
-    }
-
     #endregion
 
     #region roms
@@ -354,7 +448,7 @@ public partial class Emulator : ComponentBase, IDisposable
                 if (err is not null) { _romMessage = err; break; }
             }
             if (_roms.HasDrive) _attachDrive = true;
-            if (_roms.IsComplete && _state == EmuState.NeedRoms) _state = EmuState.Ready;
+            if (RomsReadyForModel && _state == EmuState.NeedRoms) _state = EmuState.Ready;
             if (_roms.IsComplete && _rememberRoms && !_roms.SaveToStorage())
                 _romMessage = "The ROMs are loaded but could not be stored (localStorage unavailable or full).";
         }
@@ -366,7 +460,7 @@ public partial class Emulator : ComponentBase, IDisposable
 
     private async Task ApplyRomsAsync()
     {
-        if (!_roms.IsComplete) return;
+        if (!RomsReadyForModel) return;
         _romMessage = null;
         if (_rememberRoms && !_roms.SaveToStorage())
             _romMessage = "Applied, but the ROMs could not be stored in localStorage.";
@@ -400,6 +494,7 @@ public partial class Emulator : ComponentBase, IDisposable
         {
             _romMessage = "Stored ROMs removed; the site has no ROM images, load your own.";
         }
+        if (IsC128 && !_roms.IsC128Complete) SelectMachine(MachineModel.C64);
     }
 
     private static async Task<byte[]> ReadAllAsync(IBrowserFile file, long maxSize)

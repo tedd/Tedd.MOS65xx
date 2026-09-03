@@ -6,8 +6,11 @@ namespace Tedd.MOS65xx.Hosting;
 /// <summary>Joystick inputs (one bit each; diagonals are two actions).</summary>
 public enum JoystickInput { Up, Down, Left, Right, Fire }
 
-/// <summary>Host-level commands that can be bound to keys.</summary>
-public enum SystemCommand { Restore, Reset, HardReset, Pause, Warp, Screenshot, MemoryViewer, SpriteViewer }
+/// <summary>
+/// Host-level commands that can be bound to keys. <see cref="ToggleColumns"/> (the C128's 40/80 DISPLAY key) and
+/// <see cref="CapsLock"/> are applied by the session itself and then reported to the host.
+/// </summary>
+public enum SystemCommand { Restore, Reset, HardReset, Pause, Warp, Screenshot, MemoryViewer, SpriteViewer, ToggleColumns, CapsLock }
 
 public enum InputActionKind { Key, Joystick, System }
 
@@ -60,6 +63,8 @@ public readonly struct InputAction : IEquatable<InputAction>
         {
             SystemCommand.Restore => "RESTORE (NMI)",
             SystemCommand.HardReset => "Hard reset",
+            SystemCommand.ToggleColumns => "40/80 DISPLAY key (C128)",
+            SystemCommand.CapsLock => "CAPS LOCK key (C128)",
             _ => Command.ToString(),
         },
     };
@@ -74,6 +79,13 @@ public readonly struct InputAction : IEquatable<InputAction>
         C64Key.Asterisk => "*", C64Key.Semicolon => ";", C64Key.Home => "CLR/HOME", C64Key.Equals => "=",
         C64Key.ArrowUp => "↑", C64Key.Slash => "/", C64Key.ArrowLeft => "←", C64Key.Control => "CTRL",
         C64Key.Space => "SPACE", C64Key.Commodore => "C=", C64Key.RunStop => "RUN/STOP",
+        C64Key.Help => "HELP (C128)", C64Key.Tab => "TAB (C128)", C64Key.Escape => "ESC (C128)", C64Key.Alt => "ALT (C128)",
+        C64Key.LineFeed => "LINE FEED (C128)", C64Key.NoScroll => "NO SCROLL (C128)",
+        C64Key.Up => "cursor up (C128)", C64Key.Down => "cursor down (C128)", C64Key.Left => "cursor left (C128)", C64Key.Right => "cursor right (C128)",
+        C64Key.KeypadEnter => "keypad ENTER (C128)", C64Key.KeypadPlus => "keypad + (C128)", C64Key.KeypadMinus => "keypad - (C128)", C64Key.KeypadPeriod => "keypad . (C128)",
+        C64Key.Keypad0 => "keypad 0 (C128)", C64Key.Keypad1 => "keypad 1 (C128)", C64Key.Keypad2 => "keypad 2 (C128)", C64Key.Keypad3 => "keypad 3 (C128)",
+        C64Key.Keypad4 => "keypad 4 (C128)", C64Key.Keypad5 => "keypad 5 (C128)", C64Key.Keypad6 => "keypad 6 (C128)", C64Key.Keypad7 => "keypad 7 (C128)",
+        C64Key.Keypad8 => "keypad 8 (C128)", C64Key.Keypad9 => "keypad 9 (C128)",
         _ => key.ToString(),
     };
 
