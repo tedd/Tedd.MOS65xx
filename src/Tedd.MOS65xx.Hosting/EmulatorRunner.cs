@@ -70,10 +70,15 @@ public sealed class EmulatorRunner : IDisposable
         }
     }
 
+    /// <summary>
+    /// <see cref="Invoke(Action)"/> for something that produces a value. The inner lambda has a statement body on
+    /// purpose: an expression bodied one is a <see cref="Func{T}"/> as well and binds to this overload again,
+    /// which recurses until the stack runs out.
+    /// </summary>
     public T Invoke<T>(Func<T> func)
     {
         T result = default!;
-        Invoke(() => result = func());
+        Invoke(() => { result = func(); });
         return result;
     }
 

@@ -39,6 +39,7 @@
                 <MenuItem x:Name="SpriteViewerMenu" Header="_Sprite Viewer..." Click="SpriteViewer_Click" InputGestureText="Alt+S" />
                 <MenuItem Header="_Key Bindings..." Click="KeyBindings_Click" />
                 <MenuItem Header="_Audio Visualizer..." Click="AudioVisualizer_Click" />
+                <MenuItem Header="_Character Set Viewer..." Click="CharsetViewer_Click" />
                 <Separator />
                 <MenuItem Header="_Type Text..." Click="TypeText_Click" />
             </MenuItem>

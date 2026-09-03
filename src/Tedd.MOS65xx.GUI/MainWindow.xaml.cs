@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private MemoryViewerWindow? _memoryViewer;
     private SpriteViewerWindow? _spriteViewer;
     private AudioVisualizerWindow? _audioVisualizer;
+    private CharsetViewerWindow? _charsetViewer;
     private string? _diskPath;
     private string _romDescription = "";
 
@@ -493,6 +494,18 @@ public partial class MainWindow : Window
         _audioVisualizer.Activate();
     }
 
+    private void CharsetViewer_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runner is null) return;
+        if (_charsetViewer is null || !_charsetViewer.IsLoaded)
+        {
+            _charsetViewer = new CharsetViewerWindow(_runner) { Owner = this };
+            _charsetViewer.Closed += (_, _) => _charsetViewer = null;
+        }
+        _charsetViewer.Show();
+        _charsetViewer.Activate();
+    }
+
     private void TypeText_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null || _runner is null) return;
@@ -536,6 +549,7 @@ public partial class MainWindow : Window
         _memoryViewer?.Close();
         _spriteViewer?.Close();
         _audioVisualizer?.Close();
+        _charsetViewer?.Close();
         if (_session is not null)
         {
             _session.Command -= OnSessionCommand;

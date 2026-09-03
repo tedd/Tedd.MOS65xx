@@ -42,6 +42,21 @@ public sealed class RomSet
         Description = description;
     }
 
+    /// <summary>
+    /// Overwrites the character generator image in place. <see cref="Char"/> is the same array the machine's
+    /// memory map reads through, so a running C64 draws the new glyphs from the next character fetch on; nothing
+    /// is written to disk. Used by the GUI's character set viewer to try a different character set live.
+    /// </summary>
+    /// <param name="data">The replacement glyphs: 4096 bytes for both sets, 2048 for the one at <paramref name="offset"/>.</param>
+    /// <param name="offset">Where in the 4096 byte image to write (0 = set 1, 2048 = set 2).</param>
+    public void ReplaceChar(ReadOnlySpan<byte> data, int offset = 0)
+    {
+        if (offset < 0 || offset > CharSize) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (data.Length + offset > CharSize)
+            throw new ArgumentException($"{data.Length} bytes at offset {offset} do not fit in a {CharSize} byte character ROM", nameof(data));
+        data.CopyTo(Char.AsSpan(offset));
+    }
+
     /// <summary>Name of the environment variable that can point at the ROM directory.</summary>
     public const string EnvironmentVariable = "C64_ROMS";
 

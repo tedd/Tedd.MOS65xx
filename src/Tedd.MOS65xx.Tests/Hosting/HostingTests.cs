@@ -320,3 +320,41 @@ public class EmulatorSessionTests
         Assert.That(big[4..], Is.EqualTo(new short[] { 3, 4, 5, 6, 7, 8, 9, 10 }));
     }
 }
+
+[TestFixture]
+public class EmulatorRunnerTests
+{
+    private static RomSet Roms()
+    {
+        var roms = RomSet.TryLoadDefault();
+        if (roms is null) Assert.Ignore("ROM images not available");
+        return roms!;
+    }
+
+    /// <summary>
+    /// Regression: the value returning overload passed an expression lambda to Invoke, which binds to
+    /// Invoke&lt;T&gt; again rather than to Invoke(Action) - so every call recursed until the stack ran out.
+    /// </summary>
+    [Test]
+    public void Invoke_With_A_Result_Runs_The_Function_Once_And_Returns_It()
+    {
+        using var runner = new EmulatorRunner(new EmulatorSession(Roms(), attachDrive: false));
+        int calls = 0;
+        int pc = runner.Invoke(() => { calls++; return (int)runner.Session.Machine.Cpu.PC; });
+        Assert.Multiple(() =>
+        {
+            Assert.That(calls, Is.EqualTo(1));
+            Assert.That(pc, Is.EqualTo((int)runner.Session.Machine.Cpu.PC));
+            Assert.That(runner.Invoke(() => "value"), Is.EqualTo("value"));
+        });
+    }
+
+    [Test]
+    public void Invoke_Without_A_Result_Runs_The_Action_Once()
+    {
+        using var runner = new EmulatorRunner(new EmulatorSession(Roms(), attachDrive: false));
+        int calls = 0;
+        runner.Invoke(() => { calls++; });
+        Assert.That(calls, Is.EqualTo(1));
+    }
+}

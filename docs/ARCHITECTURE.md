@@ -359,6 +359,47 @@ The sequencer state comes from `VicII.SpriteX/SpriteDma/SpriteDisplayed/SpriteEx
 (`SpriteViewerWindow`, `SpriteViews.cs`) is a thin layer on top: thumbnails, a zoomed pixel grid, where each
 sprite sits relative to the display window, and the register/DMA text.
 
+## Character set — `Tedd.MOS65xx.Emulator.Tools.CharacterSet`
+
+An 8 x 8 character generator — a ROM image, a file the user picked, or the 2 KiB the VIC-II is reading right
+now — together with the C64 facts about it. `FromVic` goes through `VicII.Peek` and `IVicMemory.PeekVic`, so
+capturing never touches the bus; the instance owns a copy of the bytes, so it stays stable while the machine
+runs on.
+
+```csharp
+public sealed class CharacterSet
+{
+    public const int CharacterWidth = 8, CharacterHeight = 8, BytesPerCharacter = 8;
+    public const int CharactersPerSet = 256, SetSize = 2048, RomSize = 4096, LowercaseSetOffset = 2048;
+    public const int CpuBase = 0xD000, VicShadowBase = 0x1000;
+
+    public static CharacterSet FromRom(byte[] characterRom, string name);
+    public static CharacterSet FromVic(VicII vic, int vicBank = 0);   // sets VicAddress, BankBase, IsRomShadow
+    public static int CharacterBaseOf(byte d018);                     // $D018 bits 3-1, in 2 KiB steps
+    public static byte D018For(int characterBase, byte d018);
+
+    public ReadOnlySpan<byte> Glyph(int index);
+    public void Render(int index, Span<byte> pixels, byte ink = 1, byte paper = 0);   // 8 x 8 color indices
+    public int SolidPixelCount(int index);   public bool IsBlank(int index);
+    public int InvertedMismatchCount(int setOffset);   // how much of $80-$FF is not the reverse of $00-$7F
+    public uint Crc32 { get; }
+
+    public static int ScreenCodeOf(int petscii);              // -1 for the two control code blocks
+    public static ReadOnlySpan<int> PetsciiCodesFor(int screenCode);
+    public static string Describe(int screenCode, bool lowercaseSet);
+}
+```
+
+The PETSCII mapping is the KERNAL's: `$20-$3F` stay put, `$40-$5F` become `$00-$1F`, `$60-$7F` and `$C0-$DF`
+both become `$40-$5F`, `$A0-$BF` and `$E0-$FE` both become `$60-$7F`/`$60-$7E`, `$FF` (pi) shares the glyph at
+`$5E`, and `$00-$1F`/`$80-$9F` are control codes with no glyph. Screen codes `$80-$FF` are the reverse video
+half and no PETSCII code prints them directly.
+
+The WPF character set viewer (`CharsetViewerWindow`, `CharsetViews.cs`) is a thin layer on top: the glyph grid,
+the codes and addresses of the selected character, and loading a character set from a file.
+`RomSet.ReplaceChar(ReadOnlySpan<byte>, int offset)` writes it over the running machine's character ROM in
+place — the array is the one `C64Memory` reads through, so the new glyphs appear from the next character fetch.
+
 ## PNG output — `Tedd.MOS65xx.Emulator.Tools.PngWriter`
 
 `static byte[] Encode(int width, int height, ReadOnlySpan<uint> argb)` and
