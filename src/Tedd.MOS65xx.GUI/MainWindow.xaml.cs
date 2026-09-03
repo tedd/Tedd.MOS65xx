@@ -15,6 +15,7 @@ using Tedd.MOS65xx.Emulator.Machines;
 using Tedd.MOS65xx.Emulator.Media;
 using Tedd.MOS65xx.Emulator.Tools;
 using Tedd.MOS65xx.Hosting;
+using TeddBitmap = Tedd.WriteableBitmap;
 
 namespace Tedd.MOS65xx.GUI;
 
@@ -39,7 +40,7 @@ public partial class MainWindow : Window
     private WpfVideoSink? _videoSink;
     private AudioOutput? _audioOutput;
     private AudioTap? _audioTap;
-    private WriteableBitmap? _bitmap;
+    private TeddBitmap? _bitmap;
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private MemoryViewerWindow? _memoryViewer;
     private SpriteViewerWindow? _spriteViewer;
@@ -183,6 +184,11 @@ public partial class MainWindow : Window
         }
         _runner?.Dispose();
         _runner = null;
+        // After the runner: the emulator thread writes into the sink's bitmap until it stops.
+        Screen.Source = null;
+        _bitmap = null;
+        _videoSink?.Dispose();
+        _videoSink = null;
         _audioOutput?.Dispose();
         _audioOutput = null;
         _session = null;
@@ -195,7 +201,7 @@ public partial class MainWindow : Window
     {
         if (_videoSink is null) return;
         _bitmap = _videoSink.CreateBitmap();
-        Screen.Source = _bitmap;
+        Screen.Source = _bitmap.BitmapSource;
         Screen.Width = _videoSink.Width;
         Screen.Height = _videoSink.Height;
     }
@@ -205,7 +211,7 @@ public partial class MainWindow : Window
         if (_bitmap is null || _videoSink is null) return;
         if (_videoSink.SizeChanged)
             AdoptBitmap();   // the C128 switched between its 40 and 80 column pictures
-        _videoSink.Blit(_bitmap!);
+        _videoSink.Present();
     }
 
     private void UpdateStatus()

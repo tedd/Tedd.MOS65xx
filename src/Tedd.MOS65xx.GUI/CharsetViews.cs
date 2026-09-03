@@ -6,12 +6,15 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Tedd.MOS65xx.Emulator.Tools;
 using Tedd.MOS65xx.Emulator.Video;
+// Tedd.WriteableBitmap puts a WriteableBitmap in the enclosing Tedd namespace, which wins over any
+// same-named alias here. These views want WPF's; only the emulator screen trades it for the faster one.
+using WpfBitmap = System.Windows.Media.Imaging.WriteableBitmap;
 
 namespace Tedd.MOS65xx.GUI;
 
 /// <summary>
 /// Draws a whole character set as a grid of 8 x 8 glyphs in two C64 colors, with a hex gutter showing the first
-/// character code of each row. The glyphs are decoded once into a <see cref="WriteableBitmap"/> at one bitmap
+/// character code of each row. The glyphs are decoded once into a <see cref="WpfBitmap"/> at one bitmap
 /// pixel per character pixel and scaled up with nearest neighbour sampling, so zooming stays crisp and cheap
 /// even for the 512 characters of a full ROM image. Hovering and clicking report character indices.
 /// </summary>
@@ -28,7 +31,7 @@ public sealed class CharsetView : FrameworkElement
     private static readonly Typeface GutterTypeface = new("Consolas");
 
     private CharacterSet? _source;
-    private WriteableBitmap? _bitmap;
+    private WpfBitmap? _bitmap;
     private int[] _pixels = Array.Empty<int>();
     private int _columns = 32;
     private int _zoom = 4;
@@ -147,7 +150,7 @@ public sealed class CharsetView : FrameworkElement
         int height = Rows * Size;
         if (_bitmap is null || _bitmap.PixelWidth != width || _bitmap.PixelHeight != height)
         {
-            _bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
+            _bitmap = new WpfBitmap(width, height, 96, 96, PixelFormats.Bgra32, null);
             _pixels = new int[width * height];
         }
 

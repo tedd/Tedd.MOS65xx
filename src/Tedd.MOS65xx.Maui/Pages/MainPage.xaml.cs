@@ -62,7 +62,7 @@ public partial class MainPage : ContentPage
         _session = session;
 
         _videoSink = new MauiVideoSink();
-        Screen.Sink = _videoSink;
+        Screen.Source = _videoSink.Bitmap;
         session.Video = _videoSink;
 
         _audioOutput = AudioOutput.TryCreate(session.SampleRate);
@@ -127,6 +127,10 @@ public partial class MainPage : ContentPage
         }
         _runner?.Dispose();
         _runner = null;
+        // After the runner: the emulator thread writes into the sink's buffers until it stops.
+        Screen.Source = null;
+        _videoSink?.Dispose();
+        _videoSink = null;
         _audioOutput?.Dispose();
         _audioOutput = null;
     }

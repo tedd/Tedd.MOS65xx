@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Tedd.MOS65xx.Maui.Controls;
+using Tedd.Maui;
 
 namespace Tedd.MOS65xx.Maui;
 
@@ -15,14 +15,9 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             })
-            .ConfigureMauiHandlers(handlers =>
-            {
-                // The emulator picture is the one control with no cross-platform equivalent: it needs a native
-                // surface that can take a new 384 x 272 image 50 times a second without scaling it smoothly.
-#if WINDOWS
-                handlers.AddHandler<ScreenView, ScreenViewHandler>();
-#endif
-            });
+            // The emulator picture: a GPU-backed Skia surface that takes a new 384 x 272 frame 50 times a
+            // second and magnifies it with nearest neighbour sampling. Works on every MAUI head as it stands.
+            .UseTeddWriteableBitmap();
 
 #if DEBUG
         builder.Logging.AddDebug();

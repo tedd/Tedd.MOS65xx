@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:controls="clr-namespace:Tedd.MOS65xx.Maui.Controls"
+             xmlns:tedd="clr-namespace:Tedd.Maui;assembly=Tedd.WriteableBitmap.Maui"
              xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
              x:Class="Tedd.MOS65xx.Maui.Pages.MainPage"
              Loaded="Page_Loaded"
@@ -47,7 +47,9 @@
     </ContentPage.MenuBarItems>
 
     <Grid RowDefinitions="*,Auto">
-        <controls:ScreenView x:Name="Screen" Grid.Row="0" />
+        <!-- Fills the row keeping its aspect ratio; Nearest sampling keeps C64 pixels hard edged squares. -->
+        <tedd:WriteableBitmapView x:Name="Screen" Grid.Row="0"
+                                  Aspect="AspectFit" FilterMode="Nearest" BackgroundColor="#101010" />
 
         <Grid Grid.Row="1" Style="{StaticResource StatusBar}" ColumnDefinitions="70,Auto,70,*" ColumnSpacing="14">
             <Label x:Name="FpsText" Grid.Column="0" Text="0.0 fps" VerticalOptions="Center" />

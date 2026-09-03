@@ -12,6 +12,9 @@ using Tedd.MOS65xx.Emulator.C64;
 using Tedd.MOS65xx.Emulator.Tools;
 using Tedd.MOS65xx.Emulator.Video;
 using Tedd.MOS65xx.Hosting;
+// Tedd.WriteableBitmap puts a WriteableBitmap in the enclosing Tedd namespace, which wins over any
+// same-named alias here. These views want WPF's; only the emulator screen trades it for the faster one.
+using WpfBitmap = System.Windows.Media.Imaging.WriteableBitmap;
 
 namespace Tedd.MOS65xx.GUI;
 
@@ -267,11 +270,11 @@ public partial class SpriteViewerWindow : Window
         public SpriteItem(int index)
         {
             Title = "Sprite " + index;
-            Thumbnail = new WriteableBitmap(SpriteSnapshot.Width, SpriteSnapshot.Height, 96, 96, PixelFormats.Bgra32, null);
+            Thumbnail = new WpfBitmap(SpriteSnapshot.Width, SpriteSnapshot.Height, 96, 96, PixelFormats.Bgra32, null);
         }
 
         public string Title { get; }
-        public WriteableBitmap Thumbnail { get; }
+        public WpfBitmap Thumbnail { get; }
 
         public string Summary
         {

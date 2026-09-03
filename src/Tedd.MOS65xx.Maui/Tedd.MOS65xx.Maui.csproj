@@ -6,10 +6,10 @@
 
     Only the Windows head is built here because that is the only MAUI platform whose workload this repository's
     CI installs (and the only one the WPF front-end it replaces ever supported). Everything outside
-    Platforms/Windows is platform neutral: the emulator screen is the one control that needs a native handler
-    (ScreenViewHandler), and audio, the save dialog and the physical key reader are behind small partial
-    classes with a Windows implementation. To add a head, install its workload, add the TFM below and provide
-    those four files for it.
+    Platforms/Windows is platform neutral, the emulator screen included: it is a WriteableBitmapView from
+    Tedd.WriteableBitmap.Maui, which draws through SkiaSharp on every head. What is left behind small partial
+    classes with a Windows implementation is audio, the save dialog and the physical key reader. To add a head,
+    install its workload, add the TFM below and provide those three files for it.
 
     MAUI targets net10.0: the .NET 11 MAUI workload packs are not published yet. The emulator and hosting
     libraries are consumed through their netstandard2.1 assets, which are built from exactly the same sources
@@ -48,6 +48,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+    <!-- The emulator screen: directly mutable native pixel buffers presented through a GPU-backed Skia view. -->
+    <PackageReference Include="Tedd.WriteableBitmap.Maui" Version="1.1.1" />
   </ItemGroup>
 
   <!-- Sound output. NAudio is Windows only; other heads plug their own IAudioSink into AudioOutput. -->

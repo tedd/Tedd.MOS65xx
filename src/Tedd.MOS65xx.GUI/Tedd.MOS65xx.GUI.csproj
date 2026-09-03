@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="3.0.1" />
+    <!-- Memory-section backed bitmap: the emulator thread writes the picture straight into the buffer WPF composites from. -->
+    <PackageReference Include="Tedd.WriteableBitmap" Version="1.0.4" />
   </ItemGroup>
 
   <ItemGroup>
