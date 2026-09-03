@@ -273,3 +273,103 @@ select { padding: 0.15rem 0.3rem; }
     .site-main { padding: 0.5rem 0.7rem 2rem; }
     .typebox { flex-direction: column; }
 }
+
+/* ---------- GSAP effects (js/effects.js)
+   Everything below only applies once effects.js has added .fx-on to <html>, which it does only when
+   GSAP loaded and the user has not asked for reduced motion. Without it the page renders exactly as
+   it did before. .fx-pre is the short-lived "hide what is about to animate in" state; effects.js
+   removes it as soon as it has handed the same initial values to GSAP (and after 8s regardless, so a
+   failure can never leave the page blank). */
+
+.fx-on { scroll-behavior: auto; }              /* GSAP's ScrollToPlugin does the smooth scrolling now */
+
+.fx-pre .hero > *,
+.fx-pre .site-main section > h2,
+.fx-pre .site-main section > p,
+.fx-pre .site-main .card,
+.fx-pre .site-main table.keys tr { opacity: 0; }
+
+/* Animated backdrop: raster bars and a starfield, drawn on a fixed canvas behind the page.
+   z-index -1 keeps it above the propagated body background but below every element. */
+#fx-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Scroll progress across the bottom edge of the sticky header. */
+.fx-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; }
+.fx-progress i {
+    display: block;
+    height: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    background: linear-gradient(90deg, var(--c64-blue), var(--accent), #70a4b2, #9ad284, #b8c76f);
+}
+.fx-on .site-header { transition: padding 0.25s ease, background 0.25s ease; }
+.fx-on .site-header.fx-scrolled { padding-top: 0.4rem; padding-bottom: 0.4rem; background: rgba(15, 18, 22, 0.97); }
+.fx-on .site-header nav a { transition: color 0.15s ease; position: relative; }
+.fx-on .site-header nav a.active { color: #fff; }
+.fx-on .site-header nav a.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.35rem;
+    height: 2px;
+    background: var(--accent-2);
+    border-radius: 2px;
+}
+.fx-on .site-header .logo { will-change: background-color; }
+
+/* Hero: split characters, typed tagline, and a slow CRT scan band. */
+.fx-on .hero { position: relative; overflow: hidden; }
+.fx-on .hero h1 { perspective: 600px; }
+.fx-char { display: inline-block; will-change: transform, opacity; }
+.fx-on .hero .tagline { min-height: 1.4em; }
+.fx-caret { font-family: var(--mono); color: var(--accent-2); }
+.fx-scan {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 32%;
+    pointer-events: none;
+    background: linear-gradient(180deg, transparent, rgba(143, 131, 214, 0.07), transparent);
+    /* .hero clips the band, so fade its left and right edges out too - otherwise it reads as a box. */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+
+/* Raster rule wiped in under every section heading. */
+.fx-rule {
+    display: block;
+    height: 3px;
+    width: min(220px, 60%);
+    margin: -0.2rem 0 1.2rem;
+    border-radius: 2px;
+    transform: scaleX(0);
+    background: linear-gradient(90deg, var(--c64-blue), var(--accent), #70a4b2, #9ad284, #b8c76f);
+}
+
+/* Cards tilt towards the pointer and pick up a soft highlight where it is. */
+.fx-on .grid { perspective: 900px; }
+.fx-on .card {
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.fx-on .card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), rgba(143, 131, 214, 0.16), transparent 70%);
+}
+.fx-on .card:hover { border-color: #3a4656; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45); }
+.fx-on .card:hover::after { opacity: 1; }

@@ -5,6 +5,9 @@ CIAs, SID and optionally the 1541) runs client-side in the browser; there is no 
 project doubles as the project web site (hero, features, downloads, the interactive demo and the
 keyboard help), published to GitHub Pages under `/Tedd.MOS65xx/`.
 
+The site's animation lives in `wwwroot/js/effects.js` on top of a vendored GSAP; it is layered on from the
+outside (it waits for Blazor to render, then animates), so the Razor components stay free of it.
+
 ## Layout
 
 | Path | Purpose |
@@ -19,6 +22,8 @@ keyboard help), published to GitHub Pages under `/Tedd.MOS65xx/`.
 | `Demo/DemoProgram.cs` | Generates the tech demo's 6502 source (raster bars, scroller, sprites, SID tune) and assembles it at runtime with `Tedd.MOS65xx.Emulator.Tools.Assembler`. |
 | `wwwroot/js/c64.js` | Framework-free ES module: canvas, AudioContext/worklet, key listeners, rAF loop, fullscreen, PNG download, drag & drop, localStorage. |
 | `wwwroot/js/c64-audio-worklet.js` | The `AudioWorkletProcessor` that plays the SID output. |
+| `wwwroot/js/effects.js` | Page animation (hero intro, scroll reveals, raster/starfield backdrop, card tilt, eased anchors). Presentation only - it never touches the emulator, and the page works unchanged if it does not load or the visitor prefers reduced motion. |
+| `wwwroot/js/vendor/gsap/` | GSAP 3.15.0 (core + ScrollTrigger, ScrollToPlugin, TextPlugin, SplitText), vendored so nothing is fetched from a CDN. See the README there. |
 | `wwwroot/roms/` | ROM images (git-ignored); see below. |
 | `wwwroot/index.html`, `404.html`, `.nojekyll` | Static shell, GitHub Pages SPA fallback, disable Jekyll (so `_framework` is served). |
 

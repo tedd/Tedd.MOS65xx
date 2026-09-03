@@ -18,6 +18,23 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <script type="importmap"></script>
+
+    <!--
+        Page effects (site presentation only - the emulator itself uses js/c64.js). GSAP 3.15.0 is vendored
+        under js/vendor/gsap (see the README there) so nothing is fetched from a CDN. Order matters: the core
+        first, then the plugins, then js/effects.js which registers them. "defer" keeps them out of the
+        critical path and guarantees they run in this order before DOMContentLoaded; effects.js then waits for
+        Blazor to render the page. If any of these fail to load the site simply stays static.
+        "#[.{fingerprint}]" is replaced at build time with the asset's content hash (OverrideHtmlAssetPlaceholders
+        in the .csproj), so a changed file is never served from a stale browser cache; if it were ever left
+        unreplaced it is just a URL fragment and the plain file still loads.
+    -->
+    <script defer src="js/vendor/gsap/gsap.min#[.{fingerprint}].js"></script>
+    <script defer src="js/vendor/gsap/ScrollTrigger.min#[.{fingerprint}].js"></script>
+    <script defer src="js/vendor/gsap/ScrollToPlugin.min#[.{fingerprint}].js"></script>
+    <script defer src="js/vendor/gsap/TextPlugin.min#[.{fingerprint}].js"></script>
+    <script defer src="js/vendor/gsap/SplitText.min#[.{fingerprint}].js"></script>
+    <script defer src="js/effects#[.{fingerprint}].js"></script>
     <script>
         // GitHub Pages SPA fallback: 404.html redirects unknown paths to the base with "?p=<path>"; restore it.
         (function () {
