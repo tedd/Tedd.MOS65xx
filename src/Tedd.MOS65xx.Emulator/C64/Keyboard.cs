@@ -26,6 +26,15 @@ public enum C64Key : byte
     Pound = 48, Asterisk = 49, Semicolon = 50, Home = 51, RightShift = 52, Equals = 53, ArrowUp = 54, Slash = 55,
     // Row 7 (PA7)
     D1 = 56, ArrowLeft = 57, Control = 58, D2 = 59, Space = 60, Commodore = 61, Q = 62, RunStop = 63,
+
+    // The 24 extra keys of the Commodore 128 sit on three more row lines (K0-K2) that the VIC-IIe drives through
+    // $D02F instead of CIA 1; a C64 never selects those rows, so these keys simply do nothing there.
+    // Row 8 (K0)
+    Help = 64, Keypad8 = 65, Keypad5 = 66, Tab = 67, Keypad2 = 68, Keypad4 = 69, Keypad7 = 70, Keypad1 = 71,
+    // Row 9 (K1)
+    Escape = 72, KeypadPlus = 73, KeypadMinus = 74, LineFeed = 75, KeypadEnter = 76, Keypad6 = 77, Keypad9 = 78, Keypad3 = 79,
+    // Row 10 (K2)
+    Alt = 80, Keypad0 = 81, KeypadPeriod = 82, Up = 83, Down = 84, Left = 85, Right = 86, NoScroll = 87,
 }
 
 /// <summary>
@@ -35,9 +44,20 @@ public enum C64Key : byte
 /// </summary>
 public sealed class Keyboard
 {
-    private readonly bool[] _pressed = new bool[64];
-    private readonly byte[] _rowMasks = new byte[8];    // for each row (PA line) the columns (PB bits) pressed
-    private readonly byte[] _columnMasks = new byte[8]; // for each column (PB line) the rows (PA bits) pressed
+    /// <summary>Rows driven by CIA 1 port A.</summary>
+    public const int CiaRows = 8;
+    /// <summary>Total rows including the three C128 rows driven by the VIC-IIe (K0-K2).</summary>
+    public const int Rows = 11;
+
+    private readonly bool[] _pressed = new bool[Rows * 8];
+    private readonly byte[] _rowMasks = new byte[Rows];  // for each row (PA / K line) the columns (PB bits) pressed
+    private readonly byte[] _columnMasks = new byte[8]; // for each column (PB line) the CIA rows (PA bits) pressed
+
+    /// <summary>
+    /// Levels of the three extra row lines K0-K2 of the C128 (bits 0-2, 1 = high = not selected), as driven by
+    /// the VIC-IIe's $D02F. A C64 leaves them high, so the extended keys never show up there.
+    /// </summary>
+    public int ExtendedRowLevels = 7;
 
     /// <summary>The RESTORE key is not part of the matrix; it pulses the NMI line.</summary>
     public bool RestorePressed { get; private set; }
@@ -55,12 +75,12 @@ public sealed class Keyboard
         if (pressed)
         {
             _rowMasks[row] |= (byte)(1 << col);
-            _columnMasks[col] |= (byte)(1 << row);
+            if (row < CiaRows) _columnMasks[col] |= (byte)(1 << row);
         }
         else
         {
             _rowMasks[row] &= (byte)~(1 << col);
-            _columnMasks[col] &= (byte)~(1 << row);
+            if (row < CiaRows) _columnMasks[col] &= (byte)~(1 << row);
         }
     }
 
@@ -77,6 +97,7 @@ public sealed class Keyboard
     /// <summary>
     /// Column levels (CIA1 port B input) given the row levels driven on CIA1 port A: a pressed key connects its
     /// row line to its column line, so a column reads low when any of its pressed keys sits on a row that is low.
+    /// The C128's K0-K2 rows (<see cref="ExtendedRowLevels"/>) take part in the same way.
     /// </summary>
     public byte ReadColumns(byte rowLevels)
     {
@@ -88,10 +109,20 @@ public sealed class Keyboard
             low &= low - 1;
             result &= ~_rowMasks[row];
         }
+        low = ~ExtendedRowLevels & 7;
+        while (low != 0)
+        {
+            int row = TrailingZeroCount(low);
+            low &= low - 1;
+            result &= ~_rowMasks[CiaRows + row];
+        }
         return (byte)result;
     }
 
-    /// <summary>Row levels (CIA1 port A input) given the column levels driven on CIA1 port B (the matrix is symmetric).</summary>
+    /// <summary>
+    /// Row levels (CIA1 port A input) given the column levels driven on CIA1 port B (the matrix is symmetric).
+    /// Only the eight CIA rows can be read back; the K0-K2 lines are outputs of the VIC-IIe.
+    /// </summary>
     public byte ReadRows(byte columnLevels)
     {
         int result = 0xFF;

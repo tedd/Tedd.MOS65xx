@@ -171,17 +171,47 @@ public sealed partial class VicII : IClockable
     private bool _lightPen;
     private bool _lightPenLatched;
 
+    // VIC-IIe (8564/8566, Commodore 128) additions: $D02F keyboard lines K0-K2, $D030 clock control
+    private readonly bool _c128;
+    private int _keyboardLines = 7;
+    private bool _fastMode;
+    private bool _testBit;
+
     /// <summary>The rendered frame, <see cref="FrameWidth"/> x <see cref="FrameHeight"/> ARGB pixels.</summary>
     public uint[] Frame { get; } = new uint[FrameWidth * FrameHeight];
 
     /// <summary>Raised at the end of the last cycle of line 311.</summary>
     public event Action? FrameCompleted;
 
-    public VicII(IVicMemory memory)
+    public VicII(IVicMemory memory) : this(memory, false) { }
+
+    /// <param name="memory">The memory the VIC reads from.</param>
+    /// <param name="c128">
+    /// true = VIC-IIe (8564/8566) as used in the Commodore 128: registers $D02F (keyboard lines K0-K2) and $D030
+    /// (2 MHz mode) exist; false = the 6569 of the C64 where those addresses read $FF.
+    /// </param>
+    public VicII(IVicMemory memory, bool c128)
     {
         _memory = memory ?? throw new ArgumentNullException(nameof(memory));
+        _c128 = c128;
         Reset();
     }
+
+    /// <summary>True for the VIC-IIe (C128) variant with the $D02F/$D030 registers.</summary>
+    public bool IsVicIIe => _c128;
+
+    /// <summary>
+    /// Levels of the three extra keyboard row lines K0-K2 of the C128 (bits 0-2 of $D02F, 1 = high). The C128
+    /// feeds them to <see cref="C64.Keyboard.ExtendedRowLevels"/>. Always 7 on a C64.
+    /// </summary>
+    public int KeyboardLines => _keyboardLines;
+
+    /// <summary>
+    /// 2 MHz mode ($D030 bit 0, VIC-IIe only). The 8502 then runs two cycles per VIC cycle and the VIC gets no
+    /// bus access: it keeps its timing (raster counter, interrupts) but performs no memory fetches and never
+    /// asserts BA; the graphics data reads as $FF (an unloaded bus), which is why FAST also blanks the screen.
+    /// </summary>
+    public bool FastMode => _fastMode;
 
     /// <summary>BA line, true = asserted (the CPU must stop at its next read cycle).</summary>
     public bool Ba => _ba;
@@ -289,6 +319,9 @@ public sealed partial class VicII : IClockable
         _sprDisplayMask = 0;
         _lightPen = false;
         _lightPenLatched = false;
+        _keyboardLines = 7;
+        _fastMode = false;
+        _testBit = false;
     }
 
     // ------------------------------------------------------------------------------------------------------
@@ -314,7 +347,14 @@ public sealed partial class VicII : IClockable
     {
         reg &= 0x3F;
         if (reg >= 0x2F)
-            return 0xFF;                                           // 3.2: $D02F-$D03F are not connected, read $FF
+        {
+            // 3.2: $D02F-$D03F are not connected on the 6569 and read $FF. The VIC-IIe has two more registers:
+            // $D02F (K0-K2 keyboard lines, bits 3-7 read 1) and $D030 (bit 0 = 2 MHz, bit 1 = test, rest read 1).
+            if (!_c128) return 0xFF;
+            if (reg == 0x2F) return (byte)(0xF8 | _keyboardLines);
+            if (reg == 0x30) return (byte)(0xFC | (_fastMode ? 1 : 0) | (_testBit ? 2 : 0));
+            return 0xFF;
+        }
         switch (reg)
         {
             case 0x11: return (byte)((_regs[0x11] & 0x7F) | ((_raster & 0x100) >> 1)); // RST8 = raster bit 8
@@ -333,7 +373,13 @@ public sealed partial class VicII : IClockable
     {
         reg &= 0x3F;
         if (reg >= 0x2F)
-            return;                                                // 3.2: writes to $D02F-$D03F are ignored
+        {
+            // 3.2: writes to $D02F-$D03F are ignored on the 6569; the VIC-IIe latches K0-K2 and the clock bits.
+            if (!_c128) return;
+            if (reg == 0x2F) _keyboardLines = value & 7;
+            else if (reg == 0x30) { _fastMode = (value & 1) != 0; _testBit = (value & 2) != 0; }
+            return;
+        }
         switch (reg)
         {
             case < 0x10:
@@ -522,11 +568,11 @@ public sealed partial class VicII : IClockable
                 SpriteDmaCheck();
                 break;
             case 56:
-                _memory.ReadVic(ecm ? 0x39FF : 0x3FFF);            // idle access (3.6.3 "i")
+                Fetch(ecm ? 0x39FF : 0x3FFF);                      // idle access (3.6.3 "i")
                 SpriteDmaCheck();
                 break;
             case 57:
-                _memory.ReadVic(ecm ? 0x39FF : 0x3FFF);            // idle access
+                Fetch(ecm ? 0x39FF : 0x3FFF);                      // idle access
                 break;
             case 58:
                 // 3.7.2 rule 5: RC = 7 -> idle state and VC -> VCBASE; RC incremented in display state.
@@ -588,6 +634,7 @@ public sealed partial class VicII : IClockable
                 if (d < 5) { ba = true; break; }
             }
         }
+        if (_fastMode) ba = false;                                 // 2 MHz mode: the VIC never takes the bus
         _ba = ba;
         _baCount = ba ? _baCount + 1 : 0;
 
@@ -623,6 +670,10 @@ public sealed partial class VicII : IClockable
         }
     }
 
+    /// <summary>A VIC memory access; in 2 MHz mode the VIC gets no bus cycle and sees an unloaded bus ($FF).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private byte Fetch(int address14) => _fastMode ? (byte)0xFF : _memory.ReadVic(address14);
+
     /// <summary>3.8.1 rule 3 (cycles 55 and 56): sprite enabled and Y = RASTER bits 0-7 turns the DMA on.</summary>
     private void SpriteDmaCheck()
     {
@@ -645,7 +696,7 @@ public sealed partial class VicII : IClockable
     private void SpritePointerAccess(int n)
     {
         int vm = (_regs[0x18] & 0xF0) << 6;
-        _sprPointer[n] = _memory.ReadVic(vm | 0x3F8 | n);
+        _sprPointer[n] = Fetch(vm | 0x3F8 | n);
     }
 
     /// <summary>
@@ -655,7 +706,7 @@ public sealed partial class VicII : IClockable
     private void SpriteDataAccess(int n)
     {
         if (!_sprDma[n]) return;
-        byte data = _memory.ReadVic((_sprPointer[n] << 6) | _sprMc[n]);
+        byte data = Fetch((_sprPointer[n] << 6) | _sprMc[n]);
         _sprShift[n] = ((_sprShift[n] << 8) | data) & 0xFFFFFF;
         _sprMc[n] = (_sprMc[n] + 1) & 0x3F;
     }
@@ -663,7 +714,7 @@ public sealed partial class VicII : IClockable
     /// <summary>r-access: DRAM refresh, address $3Fxx from the decrementing REF counter (3.6.3).</summary>
     private void RefreshAccess()
     {
-        _memory.ReadVic(0x3F00 | _refresh);
+        Fetch(0x3F00 | _refresh);
         _refresh--;
     }
 
@@ -693,7 +744,7 @@ public sealed partial class VicII : IClockable
         {
             address = ecm ? 0x39FF : 0x3FFF;
         }
-        _fetchG = _memory.ReadVic(address);
+        _fetchG = Fetch(address);
         _fetchV = v;
         _fetchC = c;
         _fetchValid = true;
@@ -710,8 +761,8 @@ public sealed partial class VicII : IClockable
         if (Aec)
         {
             int vm = (_regs[0x18] & 0xF0) << 6;
-            _vbuf[_vmli] = _memory.ReadVic(vm | _vc);
-            _lastColor = (byte)(_memory.ReadColor(_vc) & 0x0F);
+            _vbuf[_vmli] = Fetch(vm | _vc);
+            _lastColor = _fastMode ? _lastColor : (byte)(_memory.ReadColor(_vc) & 0x0F);
             _cbuf[_vmli] = _lastColor;
         }
         else
