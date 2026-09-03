@@ -316,16 +316,21 @@ public sealed class C64Memory : IBus, IVicMemory
     /// </summary>
     public byte ReadVic(int address14)
     {
-        int a = address14 & 0x3FFF;
-        byte v;
-        if (_ultimax && a >= 0x3000 && _cartridge?.RomH is { } h)
-            v = h[a & 0x0FFF | 0x1000];
-        else if ((a & 0x3000) == 0x1000 && (VicBank & 1) == 0 && !_ultimax)
-            v = _char[a & 0x0FFF];
-        else
-            v = Ram[(VicBank << 14) | a];
+        byte v = PeekVic(address14);
         LastBusValue = v;
         return v;
+    }
+
+    /// <summary>The same read without leaving the value on the bus, for debuggers and viewers.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte PeekVic(int address14)
+    {
+        int a = address14 & 0x3FFF;
+        if (_ultimax && a >= 0x3000 && _cartridge?.RomH is { } h)
+            return h[a & 0x0FFF | 0x1000];
+        if ((a & 0x3000) == 0x1000 && (VicBank & 1) == 0 && !_ultimax)
+            return _char[a & 0x0FFF];
+        return Ram[(VicBank << 14) | a];
     }
 
     public byte ReadColor(int address10) => (byte)(ColorRam[address10 & 0x3FF] & 0x0F);

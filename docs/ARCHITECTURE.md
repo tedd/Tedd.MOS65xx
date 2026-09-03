@@ -120,6 +120,7 @@ public interface IVicMemory
 {
     byte ReadVic(int address14);   // 0..$3FFF inside the currently selected VIC bank
     byte ReadColor(int address10); // 0..$3FF, returns 0..15
+    byte PeekVic(int address14);   // the same read without leaving the value on the bus (debuggers)
 }
 ```
 
@@ -324,6 +325,39 @@ numbers `$hex %bin decimal 'c'`; all addressing modes incl. `(zp,X)`, `(zp),Y`, 
 chosen automatically when the operand is known and < 256 and the mode exists; forward references assemble
 as absolute; undocumented mnemonics (SLO RLA SRE RRA SAX LAX DCP ISC ANC ALR ARR ANE/XAA SBX/AXS LAS
 SHA/AHX SHX SHY TAS/SHS JAM/KIL NOP-with-operand) supported.
+
+## Sprite snapshot — `Tedd.MOS65xx.Emulator.Tools.SpriteSnapshot`
+
+Decodes the eight VIC-II sprites for debuggers and viewers without disturbing the machine: registers through
+`VicII.Peek` (so `$D01E`/`$D01F` are *not* cleared) and memory through `IVicMemory.PeekVic` (so nothing is left
+on the bus). `Update` refills the same instance, so a viewer that refreshes several times per second allocates
+nothing.
+
+```csharp
+public sealed class SpriteSnapshot
+{
+    public const int Width = 24, Height = 21, DataSize = 63;
+    public const byte Transparent = 0xFF;
+    public static SpriteSnapshot Capture(VicII vic, int vicBank = 0);
+    public void Update(VicII vic, int vicBank = 0);
+    public IReadOnlyList<SpriteInfo> Sprites { get; }   // also this[n]
+    // $D015, $D017, $D01B-$D01F, $D021, $D025/$D026, video matrix, bank base, active DMA count
+}
+
+public sealed class SpriteInfo
+{
+    // MxX/MxY (also relative to the display window), color, multicolor/expansion/priority flags, collisions,
+    // pointer and data address (inside the bank and as the CPU sees it), the 63 data bytes, and the sequencer
+    // state: DMA on, display state, MC/MCBASE, Y expansion flip-flop, shift register.
+    public void Render(Span<byte> pixels);   // 24 x 21 color indices, Transparent where nothing is drawn
+    public int SolidPixelCount();
+}
+```
+
+The sequencer state comes from `VicII.SpriteX/SpriteDma/SpriteDisplayed/SpriteExpansionFlipFlop/SpriteMc/`
+`SpriteMcBase/SpritePointer/SpriteShiftRegister(int n)`, all side effect free. The WPF sprite viewer
+(`SpriteViewerWindow`, `SpriteViews.cs`) is a thin layer on top: thumbnails, a zoomed pixel grid, where each
+sprite sits relative to the display window, and the register/DMA text.
 
 ## PNG output — `Tedd.MOS65xx.Emulator.Tools.PngWriter`
 

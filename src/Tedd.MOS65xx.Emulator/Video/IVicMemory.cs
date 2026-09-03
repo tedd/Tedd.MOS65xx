@@ -12,4 +12,10 @@ public interface IVicMemory
 
     /// <summary>Reads one color RAM nibble. <paramref name="address10"/> is 0..$3FF; the result is 0..15.</summary>
     byte ReadColor(int address10);
+
+    /// <summary>
+    /// Same as <see cref="ReadVic"/> but without side effects, for debuggers and viewers: a real read also
+    /// leaves the value on the bus, where an open-bus CPU read would pick it up.
+    /// </summary>
+    byte PeekVic(int address14);
 }

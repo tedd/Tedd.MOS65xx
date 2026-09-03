@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private WriteableBitmap? _bitmap;
     private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private MemoryViewerWindow? _memoryViewer;
+    private SpriteViewerWindow? _spriteViewer;
     private AudioVisualizerWindow? _audioVisualizer;
     private string? _diskPath;
     private string _romDescription = "";
@@ -140,6 +141,7 @@ public partial class MainWindow : Window
             case SystemCommand.Warp: SetWarp(!_runner.Warp); break;
             case SystemCommand.Screenshot: SaveScreenshot(); break;
             case SystemCommand.MemoryViewer: ShowMemoryViewer(); break;
+            case SystemCommand.SpriteViewer: ShowSpriteViewer(); break;
         }
     }
 
@@ -165,6 +167,7 @@ public partial class MainWindow : Window
         WarpMenu.InputGestureText = Gesture(SystemCommand.Warp, "Alt+W");
         ScreenshotMenu.InputGestureText = Gesture(SystemCommand.Screenshot, "");
         MemoryViewerMenu.InputGestureText = Gesture(SystemCommand.MemoryViewer, "Alt+M");
+        SpriteViewerMenu.InputGestureText = Gesture(SystemCommand.SpriteViewer, "Alt+S");
     }
 
     private void SetPaused(bool paused)
@@ -173,6 +176,7 @@ public partial class MainWindow : Window
         _runner.Paused = paused;
         PauseMenu.IsChecked = paused;
         _memoryViewer?.OnFreezeChanged();
+        _spriteViewer?.OnFreezeChanged();
     }
 
     private void SetWarp(bool warp)
@@ -218,6 +222,7 @@ public partial class MainWindow : Window
             {
                 case Key.W: SetWarp(!_runner.Warp); e.Handled = true; return;
                 case Key.M: ShowMemoryViewer(); e.Handled = true; return;
+                case Key.S: ShowSpriteViewer(); e.Handled = true; return;
                 case Key.F4: return; // let WPF close the window
             }
         }
@@ -453,6 +458,20 @@ public partial class MainWindow : Window
         _memoryViewer.Activate();
     }
 
+    private void SpriteViewer_Click(object sender, RoutedEventArgs e) => ShowSpriteViewer();
+
+    private void ShowSpriteViewer()
+    {
+        if (_runner is null) return;
+        if (_spriteViewer is null || !_spriteViewer.IsLoaded)
+        {
+            _spriteViewer = new SpriteViewerWindow(_runner, SetPaused) { Owner = this };
+            _spriteViewer.Closed += (_, _) => _spriteViewer = null;
+        }
+        _spriteViewer.Show();
+        _spriteViewer.Activate();
+    }
+
     private void KeyBindings_Click(object sender, RoutedEventArgs e)
     {
         if (_runner is null) return;
@@ -498,7 +517,7 @@ public partial class MainWindow : Window
             "[ = @, ] = *, ` = <-, \\ = £\n\n" +
             "Joystick (port 2): numeric keypad 8/2/4/6, 0 / 5 / Right Alt = fire. Machine > Swap Joystick Ports moves it to port 1.\n\n" +
             "Bound commands (default): F11 reset, F12 screenshot, Pause = freeze.\n" +
-            "Window shortcuts: F9 attach disk, F10 attach program, Alt+W warp, Alt+M memory viewer.",
+            "Window shortcuts: F9 attach disk, F10 attach program, Alt+W warp, Alt+M memory viewer, Alt+S sprite viewer.",
             "Keyboard", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -515,6 +534,7 @@ public partial class MainWindow : Window
         CompositionTarget.Rendering -= OnRendering;
         _statusTimer.Stop();
         _memoryViewer?.Close();
+        _spriteViewer?.Close();
         _audioVisualizer?.Close();
         if (_session is not null)
         {

@@ -7,7 +7,7 @@ namespace Tedd.MOS65xx.Hosting;
 public enum JoystickInput { Up, Down, Left, Right, Fire }
 
 /// <summary>Host-level commands that can be bound to keys.</summary>
-public enum SystemCommand { Restore, Reset, HardReset, Pause, Warp, Screenshot, MemoryViewer }
+public enum SystemCommand { Restore, Reset, HardReset, Pause, Warp, Screenshot, MemoryViewer, SpriteViewer }
 
 public enum InputActionKind { Key, Joystick, System }
 

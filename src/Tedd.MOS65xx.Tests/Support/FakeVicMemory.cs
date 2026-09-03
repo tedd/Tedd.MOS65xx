@@ -34,6 +34,8 @@ public sealed class FakeVicMemory : IVicMemory
         return Ram[address14 & 0x3FFF];
     }
 
+    public byte PeekVic(int address14) => Ram[address14 & 0x3FFF];
+
     public byte ReadColor(int address10) => (byte)(ColorRam[address10 & 0x3FF] & 0x0F);
 
     public void Fill(int address, int length, byte value)

@@ -219,6 +219,34 @@ public sealed partial class VicII : IClockable
     /// <summary>The memory this VIC reads from.</summary>
     public IVicMemory Memory => _memory;
 
+    // ------------------------------------------------------------------------------------------------------
+    // Sprite state for debuggers (3.8). None of these have side effects; <paramref name="n"/> is 0..7.
+    // ------------------------------------------------------------------------------------------------------
+
+    /// <summary>X coordinate of sprite <paramref name="n"/> (0..511): $D000 + 2n with the MSB from $D010.</summary>
+    public int SpriteX(int n) => _sprX[n & 7];
+
+    /// <summary>True while the sprite DMA of sprite <paramref name="n"/> is on (3.8.1 rules 3-5).</summary>
+    public bool SpriteDma(int n) => _sprDma[n & 7];
+
+    /// <summary>True while sprite <paramref name="n"/> is in display state, i.e. its data is shifted out (3.8.1 rule 4).</summary>
+    public bool SpriteDisplayed(int n) => _sprDisplay[n & 7];
+
+    /// <summary>Y expansion flip-flop of sprite <paramref name="n"/>; cleared it makes MCBASE stall for one line (3.8.1).</summary>
+    public bool SpriteExpansionFlipFlop(int n) => _sprExpFF[n & 7];
+
+    /// <summary>MC of sprite <paramref name="n"/>: the offset (0..63) of its next s-access within the 64 byte block.</summary>
+    public int SpriteMc(int n) => _sprMc[n & 7];
+
+    /// <summary>MCBASE of sprite <paramref name="n"/>: the MC value reloaded at the start of each raster line.</summary>
+    public int SpriteMcBase(int n) => _sprMcBase[n & 7];
+
+    /// <summary>Sprite pointer of sprite <paramref name="n"/> as last read by a p-access (0 before the first one).</summary>
+    public byte SpritePointer(int n) => _sprPointer[n & 7];
+
+    /// <summary>The 24 bit shift register of sprite <paramref name="n"/>, the three bytes of the current line.</summary>
+    public uint SpriteShiftRegister(int n) => _sprShift[n & 7];
+
     /// <summary>Resets all registers and internal state (registers read 0, sprites off, idle state).</summary>
     public void Reset()
     {
