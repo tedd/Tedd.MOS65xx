@@ -303,7 +303,7 @@ public partial class MemoryViewerPage : ContentPage
         Refresh();
     }
 
-    /// <summary>One line of 16 bytes. The write happens when the cell is committed, not when the property is set.</summary>
+    /// <summary>One line of 16 bytes, as displayed. Writing to memory is the page's job, not the row's.</summary>
     public sealed class Row : INotifyPropertyChanged
     {
         private readonly string[] _hex = new string[16];
@@ -348,24 +348,21 @@ public partial class MemoryViewerPage : ContentPage
             }
         }
 
-        private string Get(int i) => _hex[i];
-        private void Set(int i, string value) => _hex[i] = value; // the actual write happens on commit
-
-        public string B0 { get => Get(0); set => Set(0, value); }
-        public string B1 { get => Get(1); set => Set(1, value); }
-        public string B2 { get => Get(2); set => Set(2, value); }
-        public string B3 { get => Get(3); set => Set(3, value); }
-        public string B4 { get => Get(4); set => Set(4, value); }
-        public string B5 { get => Get(5); set => Set(5, value); }
-        public string B6 { get => Get(6); set => Set(6, value); }
-        public string B7 { get => Get(7); set => Set(7, value); }
-        public string B8 { get => Get(8); set => Set(8, value); }
-        public string B9 { get => Get(9); set => Set(9, value); }
-        public string B10 { get => Get(10); set => Set(10, value); }
-        public string B11 { get => Get(11); set => Set(11, value); }
-        public string B12 { get => Get(12); set => Set(12, value); }
-        public string B13 { get => Get(13); set => Set(13, value); }
-        public string B14 { get => Get(14); set => Set(14, value); }
-        public string B15 { get => Get(15); set => Set(15, value); }
+        public string B0 => _hex[0];
+        public string B1 => _hex[1];
+        public string B2 => _hex[2];
+        public string B3 => _hex[3];
+        public string B4 => _hex[4];
+        public string B5 => _hex[5];
+        public string B6 => _hex[6];
+        public string B7 => _hex[7];
+        public string B8 => _hex[8];
+        public string B9 => _hex[9];
+        public string B10 => _hex[10];
+        public string B11 => _hex[11];
+        public string B12 => _hex[12];
+        public string B13 => _hex[13];
+        public string B14 => _hex[14];
+        public string B15 => _hex[15];
     }
 }

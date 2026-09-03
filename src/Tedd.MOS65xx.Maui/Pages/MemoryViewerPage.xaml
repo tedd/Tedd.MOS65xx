@@ -55,22 +55,22 @@
                         <HorizontalStackLayout Padding="6,0" Spacing="0">
                             <Label Text="{Binding Address}" WidthRequest="56" FontFamily="{StaticResource MonoFont}"
                                    FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
-                            <Entry Text="{Binding B0, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B1, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B2, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B3, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B4, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B5, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B6, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B7, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B8, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B9, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B10, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B11, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B12, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B13, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B14, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B15, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B0, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B1, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B2, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B3, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B4, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B5, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B6, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B7, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B8, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B9, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B10, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B11, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B12, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B13, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B14, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B15, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
                             <Label Text="{Binding Text}" WidthRequest="150" Margin="8,0,0,0" FontFamily="{StaticResource MonoFont}"
                                    FontSize="13" VerticalOptions="Center" />
                         </HorizontalStackLayout>

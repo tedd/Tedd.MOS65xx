@@ -106,20 +106,21 @@ jobs:
     name: MAUI front-end (Windows)
     needs: test
     runs-on: windows-latest
-    # Built with the .NET 10 SDK on purpose: the MAUI workload has no .NET 11 packs yet, which is also why the
-    # project targets net10.0-windows (see its csproj). Only netstandard2.1 of the emulator and hosting
-    # libraries is built here, so the .NET 11 SDK is not needed. Failure does not hold up the rest of the
-    # deploy while the workload is in this state - drop continue-on-error once it moves to .NET 11.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          dotnet-quality: preview
+      # The MAUI head targets net10.0-windows (the .NET 11 MAUI SDK is still preview, see its csproj), but it
+      # is built with the .NET 11 SDK all the same: the workload's manifest for this SDK band carries the
+      # .NET 10 packs as well, and only the .NET 11 SDK can restore the emulator and hosting libraries, whose
+      # TargetFrameworks include net11.0.
       - name: Install the MAUI workload
         run: dotnet workload install maui-windows
+      # -f is needed because the project cross-targets (one TFM today, more when other heads are added).
       - name: Publish
-        run: dotnet publish src/Tedd.MOS65xx.Maui/Tedd.MOS65xx.Maui.csproj -c Release -r win-x64 --self-contained true -p:DebugType=none -o publish/maui-win-x64
+        run: dotnet publish src/Tedd.MOS65xx.Maui/Tedd.MOS65xx.Maui.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --self-contained true -p:DebugType=none -o publish/maui-win-x64
       - name: Package
         shell: pwsh
         run: |
