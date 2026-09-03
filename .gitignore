@@ -291,8 +291,9 @@ __pycache__/
 /src/Tedd.MOS65xx.GUI/*.[Dd]64
 /src/Tedd.MOS65xx.GUI/*.[Tt]64
 
-# Claude Code worktrees / local state
+# Claude Code worktrees / local state (settings.local.json holds per-machine permission grants)
 .claude/worktrees/
+.claude/settings.local.json
 
 # Unity package: the plugin DLLs are produced by tools/build-unity-package.ps1 / .sh and never committed
 /unity/com.tedd.mos65xx/Runtime/Plugins/*.dll
