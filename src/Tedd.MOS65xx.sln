@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tedd.MOS65xx.Unity", "Tedd.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tedd.MOS65xx.Web", "Tedd.MOS65xx.Web\Tedd.MOS65xx.Web.csproj", "{185E9A97-A655-4411-8686-53AC745C96D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tedd.MOS65xx.Maui", "Tedd.MOS65xx.Maui\Tedd.MOS65xx.Maui.csproj", "{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{185E9A97-A655-4411-8686-53AC745C96D6}.Release|x64.Build.0 = Release|Any CPU
 		{185E9A97-A655-4411-8686-53AC745C96D6}.Release|x86.ActiveCfg = Release|Any CPU
 		{185E9A97-A655-4411-8686-53AC745C96D6}.Release|x86.Build.0 = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|x64.Build.0 = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Debug|x86.Build.0 = Debug|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|x64.ActiveCfg = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|x64.Build.0 = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|x86.ActiveCfg = Release|Any CPU
+		{50B7EE77-5941-49D6-B01C-64EA9E47F9D0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

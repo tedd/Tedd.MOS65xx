@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Tedd.MOS65xx.Maui.Pages"
+             x:Class="Tedd.MOS65xx.Maui.Pages.MemoryViewerPage"
+             Title="Memory Viewer / Editor"
+             Unloaded="Page_Unloaded">
+    <ContentPage.Resources>
+        <Style x:Key="Cell" TargetType="Entry">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="WidthRequest" Value="34" />
+            <Setter Property="HeightRequest" Value="26" />
+            <Setter Property="MaxLength" Value="2" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,320">
+
+        <!-- Toolbar -->
+        <ScrollView Grid.Row="0" Grid.ColumnSpan="2" Style="{StaticResource ToolBar}">
+            <HorizontalStackLayout Spacing="8">
+                <Button x:Name="FreezeButton" Text="Freeze" Clicked="Freeze_Clicked" Padding="10,2" />
+                <Label Text="Source:" VerticalOptions="Center" />
+                <Picker x:Name="SourceBox" WidthRequest="230" SelectedIndexChanged="Source_Changed">
+                    <Picker.Items>
+                        <x:String>CPU view (as the 6510 sees it)</x:String>
+                        <x:String>RAM (64K)</x:String>
+                        <x:String>Color RAM ($D800)</x:String>
+                        <x:String>VIC-II view (16K bank)</x:String>
+                        <x:String>1541 RAM (2K)</x:String>
+                        <x:String>1541 CPU view</x:String>
+                    </Picker.Items>
+                </Picker>
+                <Label Text="Go to $" VerticalOptions="Center" />
+                <Entry x:Name="GotoBox" WidthRequest="70" Completed="Goto_Completed" />
+                <Button Text="Go" Clicked="Goto_Clicked" Padding="10,2" />
+                <Button Text="Refresh" Clicked="Refresh_Clicked" Padding="10,2" />
+                <CheckBox x:Name="AutoRefresh" IsChecked="True" VerticalOptions="Center" />
+                <Label Text="Auto refresh" VerticalOptions="Center" />
+                <Label Text="Edit a hex cell and press Enter to write to memory." Style="{StaticResource Subtle}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </ScrollView>
+
+        <!-- Hex dump -->
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*">
+            <ScrollView Grid.Row="0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                <HorizontalStackLayout x:Name="ColumnHeader" Padding="6,2" Spacing="0" />
+            </ScrollView>
+            <CollectionView x:Name="HexGrid" Grid.Row="1" ItemSizingStrategy="MeasureFirstItem">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="pages:MemoryViewerPage+Row">
+                        <HorizontalStackLayout Padding="6,0" Spacing="0">
+                            <Label Text="{Binding Address}" WidthRequest="56" FontFamily="{StaticResource MonoFont}"
+                                   FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
+                            <Entry Text="{Binding B0, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B1, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B2, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B3, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B4, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B5, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B6, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B7, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B8, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B9, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B10, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B11, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B12, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B13, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B14, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Entry Text="{Binding B15, Mode=TwoWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
+                            <Label Text="{Binding Text}" WidthRequest="150" Margin="8,0,0,0" FontFamily="{StaticResource MonoFont}"
+                                   FontSize="13" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+
+        <!-- Machine state -->
+        <ScrollView Grid.Row="1" Grid.Column="1" Style="{StaticResource SidePanel}">
+            <VerticalStackLayout Padding="8,6" Spacing="2">
+                <Label Text="CPU registers" FontAttributes="Bold" Margin="0,4,0,2" />
+                <Label x:Name="RegistersText" Style="{StaticResource Mono}" />
+                <Label Text="Disassembly at PC" FontAttributes="Bold" Margin="0,8,0,2" />
+                <Label x:Name="DisassemblyText" Style="{StaticResource Mono}" />
+                <Label Text="Stepping (frozen only)" FontAttributes="Bold" Margin="0,8,0,2" />
+                <HorizontalStackLayout Spacing="4">
+                    <Button x:Name="StepCycleButton" Text="Cycle" Clicked="StepCycle_Clicked" Padding="10,2" />
+                    <Button x:Name="StepInstructionButton" Text="Instruction" Clicked="StepInstruction_Clicked" Padding="10,2" />
+                    <Button x:Name="StepFrameButton" Text="Frame" Clicked="StepFrame_Clicked" Padding="10,2" />
+                </HorizontalStackLayout>
+                <Label Text="Machine" FontAttributes="Bold" Margin="0,8,0,2" />
+                <Label x:Name="MachineText" Style="{StaticResource Mono}" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

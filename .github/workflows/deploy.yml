@@ -97,8 +97,45 @@ jobs:
             Automated build of commit ${{ github.sha }}.
 
             * `Tedd.MOS65xx-win-x64.zip` - Windows desktop emulator (WPF). Put your ROM images in a `roms` folder next to the exe (see README).
+            * `Tedd.MOS65xx-maui-win-x64.zip` - the same desktop emulator on .NET MAUI.
             * `Tedd.MOS65xx-sdl-win-x64.zip` / `Tedd.MOS65xx-sdl-linux-x64.tar.gz` - SDL2 front-end.
             * `Tedd.MOS65xx-unity-package.zip` - Unity (UPM) package with the netstandard2.1 assemblies.
+          files: dist/*.zip
+
+  maui:
+    name: MAUI front-end (Windows)
+    needs: test
+    runs-on: windows-latest
+    # Built with the .NET 10 SDK on purpose: the MAUI workload has no .NET 11 packs yet, which is also why the
+    # project targets net10.0-windows (see its csproj). Only netstandard2.1 of the emulator and hosting
+    # libraries is built here, so the .NET 11 SDK is not needed. Failure does not hold up the rest of the
+    # deploy while the workload is in this state - drop continue-on-error once it moves to .NET 11.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install the MAUI workload
+        run: dotnet workload install maui-windows
+      - name: Publish
+        run: dotnet publish src/Tedd.MOS65xx.Maui/Tedd.MOS65xx.Maui.csproj -c Release -r win-x64 --self-contained true -p:DebugType=none -o publish/maui-win-x64
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item README.md, LICENSE publish/maui-win-x64/
+          Compress-Archive -Path publish/maui-win-x64/* -DestinationPath dist/Tedd.MOS65xx-maui-win-x64.zip
+          Get-ChildItem dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maui-builds
+          path: dist/*.zip
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Build ${{ github.run_number }}
           files: dist/*.zip
 
   linux-sdl:

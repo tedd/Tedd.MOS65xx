@@ -1,10 +1,10 @@
 using System;
 
-namespace Tedd.MOS65xx.GUI;
+namespace Tedd.MOS65xx.Hosting;
 
 /// <summary>
 /// Small in-place radix-2 FFT with a Hann window, sized once and reused (no allocations per transform).
-/// Used by the audio visualizer for a 1024 point magnitude spectrum.
+/// Used by the audio visualizers for a 1024 point magnitude spectrum.
 /// </summary>
 public sealed class Fft
 {

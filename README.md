@@ -1,7 +1,8 @@
 # Tedd.MOS65xx
 
 A cycle-exact Commodore 64 emulator written in C# (.NET 11), with a real 1541 disk drive emulation and several
-front-ends: a Windows desktop app (WPF), a browser build (Blazor WebAssembly), an SDL2 app and a Unity package.
+front-ends: two Windows desktop apps (WPF and .NET MAUI), a browser build (Blazor WebAssembly), an SDL2 app
+and a Unity package.
 
 Live demo and downloads: https://tedd.no/Tedd.MOS65xx/ (GitHub Pages, also reachable as https://tedd.github.io/Tedd.MOS65xx/; published from the `deploy` branch, see below). Binaries: https://github.com/tedd/Tedd.MOS65xx/releases/latest
 
@@ -23,6 +24,7 @@ Live demo and downloads: https://tedd.no/Tedd.MOS65xx/ (GitHub Pages, also reach
 src/Tedd.MOS65xx.Emulator   the emulator core (no UI, no dependencies)
 src/Tedd.MOS65xx.Hosting    host-agnostic session, key bindings, video/audio sink contracts
 src/Tedd.MOS65xx.GUI        Windows desktop front-end (WPF): memory viewer/editor, sprite viewer, character set viewer, key binding editor, audio visualizer
+src/Tedd.MOS65xx.Maui       the same desktop front-end ported to .NET MAUI (Windows head)
 src/Tedd.MOS65xx.Web        Blazor WebAssembly front-end and the project web site
 src/Tedd.MOS65xx.Sdl        SDL2 front-end (Windows/Linux/macOS)
 src/Tedd.MOS65xx.Unity      game-engine facade (netstandard2.1) used by the Unity package in unity/
@@ -74,6 +76,12 @@ Rendering tests write PNG frames to `TestResults/` next to the test assembly.
   and position on screen), character set viewer (the ROM sets or the 2 KiB the VIC is reading live, per character
   screen/PETSCII codes and addresses, and loading a different character set over the running machine), key binding
   editor (Tools menu) where you pick the keys that make up the joysticks, audio visualizer window.
+* **MAUI** (`src/Tedd.MOS65xx.Maui`): the WPF front-end above, feature for feature, on .NET MAUI - the same
+  windows, the same key bindings file, and the tool windows redrawn with `Microsoft.Maui.Graphics` so they are
+  not tied to Windows. Only the Windows head is built (`net10.0-windows10.0.19041.0`, because the .NET 11 MAUI
+  workload is not published yet); the emulator picture, sound, the save dialog and the physical key reader are
+  the four pieces behind a platform boundary, so adding a macOS, Android or iOS head means installing that
+  workload, adding the TFM and implementing those.
 * **Web** (`src/Tedd.MOS65xx.Web`): runs entirely in the browser (video on a canvas, audio through an AudioWorklet),
   drag-and-drop media, touch joystick, built-in tech demo.
 * **SDL2** (`src/Tedd.MOS65xx.Sdl`): `Tedd.MOS65xx.Sdl --roms <dir> --disk game.d64 --autostart`, game controller support.
@@ -86,7 +94,7 @@ W3C `KeyboardEvent.code` names and call `EmulatorSession.RunFrame()` from your l
 ## Deployment
 
 Pushing the `deploy` branch runs `.github/workflows/deploy.yml`: it tests the solution, publishes the Windows
-build and the SDL2 builds as a GitHub Release, and publishes the web site + browser emulator to GitHub Pages
+builds (WPF and MAUI) and the SDL2 builds as a GitHub Release, and publishes the web site + browser emulator to GitHub Pages
 (enable *Settings > Pages > Source: GitHub Actions* once).
 
 ## License
