@@ -62,6 +62,12 @@ public sealed partial class Z80
 
     private readonly IZ80Bus _bus;
 
+    /// <summary>
+    /// When set, every memory read and write the CPU performs is recorded here (the memory viewer's read/write
+    /// highlighting); I/O port accesses are not memory and are not recorded. null costs one branch per access.
+    /// </summary>
+    public MemoryAccessTracker? AccessTracker;
+
     // Main register set
     public byte A, F, B, C, D, E, H, L;
     // Alternate register set
@@ -231,23 +237,31 @@ public sealed partial class Z80
     // ------------------------------------------------------------------------------------------------------
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte Read(ushort address) => _bus.Read(address);
+    private byte Read(ushort address)
+    {
+        AccessTracker?.Read(address);
+        return _bus.Read(address);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Write(ushort address, byte value) => _bus.Write(address, value);
+    private void Write(ushort address, byte value)
+    {
+        AccessTracker?.Write(address);
+        _bus.Write(address, value);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ushort Read16(ushort address) => (ushort)(_bus.Read(address) | (_bus.Read((ushort)(address + 1)) << 8));
+    private ushort Read16(ushort address) => (ushort)(Read(address) | (Read((ushort)(address + 1)) << 8));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Write16(ushort address, ushort value)
     {
-        _bus.Write(address, (byte)value);
-        _bus.Write((ushort)(address + 1), (byte)(value >> 8));
+        Write(address, (byte)value);
+        Write((ushort)(address + 1), (byte)(value >> 8));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte Fetch() => _bus.Read(PC++);
+    private byte Fetch() => Read(PC++);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private ushort Fetch16()
@@ -261,9 +275,9 @@ public sealed partial class Z80
     private void Push(ushort value)
     {
         SP--;
-        _bus.Write(SP, (byte)(value >> 8));
+        Write(SP, (byte)(value >> 8));
         SP--;
-        _bus.Write(SP, (byte)value);
+        Write(SP, (byte)value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

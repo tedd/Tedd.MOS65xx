@@ -51,6 +51,12 @@ public sealed class Cpu6502
 
     private readonly IBus _bus;
 
+    /// <summary>
+    /// When set, every bus read and write the CPU performs is recorded here (the memory viewer's read/write
+    /// highlighting). Leaving it null costs one predictable branch per bus cycle.
+    /// </summary>
+    public MemoryAccessTracker? AccessTracker;
+
     // Architectural registers
     public byte A;
     public byte X;
@@ -154,8 +160,8 @@ public sealed class Cpu6502
         _servicingNmi = false;
         S = 0xFD;
         _p |= FlagI;
-        byte lo = _bus.Read(ResetVector);
-        byte hi = _bus.Read((ushort)(ResetVector + 1));
+        byte lo = Read(ResetVector);
+        byte hi = Read((ushort)(ResetVector + 1));
         PC = (ushort)(lo | (hi << 8));
         Cycles += 7;
     }
@@ -201,19 +207,19 @@ public sealed class Cpu6502
                 _nmiTake = false;
                 _irqTake = false;
                 _servicingNmi = true;
-                _bus.Read(PC);
+                Read(PC);
                 _current = Table[NmiSequence];
             }
             else if (_irqTake)
             {
                 _irqTake = false;
                 _servicingNmi = false;
-                _bus.Read(PC);
+                Read(PC);
                 _current = Table[IrqSequence];
             }
             else
             {
-                _opcode = _bus.Read(PC++);
+                _opcode = Read(PC++);
                 _current = Table[_opcode];
             }
         }
@@ -265,10 +271,18 @@ public sealed class Cpu6502
     #region Helpers used by micro-ops
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private byte Read(ushort address) => _bus.Read(address);
+    private byte Read(ushort address)
+    {
+        AccessTracker?.Read(address);
+        return _bus.Read(address);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Write(ushort address, byte value) => _bus.Write(address, value);
+    private void Write(ushort address, byte value)
+    {
+        AccessTracker?.Write(address);
+        _bus.Write(address, value);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void End() => _ended = true;

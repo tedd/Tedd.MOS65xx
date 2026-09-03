@@ -1,21 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:pages="clr-namespace:Tedd.MOS65xx.Maui.Pages"
+             xmlns:views="clr-namespace:Tedd.MOS65xx.Maui.Views"
              x:Class="Tedd.MOS65xx.Maui.Pages.MemoryViewerPage"
-             Title="Memory Viewer / Editor"
-             Unloaded="Page_Unloaded">
-    <ContentPage.Resources>
-        <Style x:Key="Cell" TargetType="Entry">
-            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="WidthRequest" Value="34" />
-            <Setter Property="HeightRequest" Value="26" />
-            <Setter Property="MaxLength" Value="2" />
-            <Setter Property="HorizontalTextAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0" />
-        </Style>
-    </ContentPage.Resources>
+             Title="Memory Viewer / Editor">
 
     <Grid RowDefinitions="Auto,*" ColumnDefinitions="*,320">
 
@@ -40,40 +28,24 @@
                 <Button Text="Refresh" Clicked="Refresh_Clicked" Padding="10,2" />
                 <CheckBox x:Name="AutoRefresh" IsChecked="True" VerticalOptions="Center" />
                 <Label Text="Auto refresh" VerticalOptions="Center" />
-                <Label Text="Edit a hex cell and press Enter to write to memory." Style="{StaticResource Subtle}" VerticalOptions="Center" />
+                <!-- Legend for the access highlights -->
+                <HorizontalStackLayout Spacing="4" Margin="8,0,0,0">
+                    <BoxView Color="#2EB82E" WidthRequest="12" HeightRequest="12" CornerRadius="2" VerticalOptions="Center" />
+                    <Label Text="read" Style="{StaticResource Subtle}" VerticalOptions="Center" />
+                    <BoxView Color="#FF8C00" WidthRequest="12" HeightRequest="12" CornerRadius="2" Margin="6,0,0,0" VerticalOptions="Center" />
+                    <Label Text="written" Style="{StaticResource Subtle}" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+                <Label Text="Click a byte to edit it; Enter writes it to memory." Style="{StaticResource Subtle}" VerticalOptions="Center" />
             </HorizontalStackLayout>
         </ScrollView>
 
-        <!-- Hex dump -->
+        <!-- Hex dump: one drawn row per 16 bytes, virtualised by the list -->
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*">
-            <ScrollView Grid.Row="0" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
-                <HorizontalStackLayout x:Name="ColumnHeader" Padding="6,2" Spacing="0" />
-            </ScrollView>
-            <CollectionView x:Name="HexGrid" Grid.Row="1" ItemSizingStrategy="MeasureFirstItem">
+            <views:HexHeaderView x:Name="Header" Grid.Row="0" />
+            <CollectionView x:Name="HexGrid" Grid.Row="1" ItemSizingStrategy="MeasureFirstItem" SelectionMode="None">
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="pages:MemoryViewerPage+Row">
-                        <HorizontalStackLayout Padding="6,0" Spacing="0">
-                            <Label Text="{Binding Address}" WidthRequest="56" FontFamily="{StaticResource MonoFont}"
-                                   FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
-                            <Entry Text="{Binding B0, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B1, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B2, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B3, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B4, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B5, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B6, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B7, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B8, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B9, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B10, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B11, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B12, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B13, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B14, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Entry Text="{Binding B15, Mode=OneWay}" Style="{StaticResource Cell}" Completed="Cell_Completed" Unfocused="Cell_Unfocused" Focused="Cell_Focused" />
-                            <Label Text="{Binding Text}" WidthRequest="150" Margin="8,0,0,0" FontFamily="{StaticResource MonoFont}"
-                                   FontSize="13" VerticalOptions="Center" />
-                        </HorizontalStackLayout>
+                    <DataTemplate x:DataType="views:HexRow">
+                        <views:HexRowView />
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
