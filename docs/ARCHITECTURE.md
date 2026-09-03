@@ -460,3 +460,164 @@ Browsers deliver these directly; WPF, SDL2 and Unity hosts keep a table from the
   reference images in `TestData/Reference/`.
 * System tests boot the real ROMs (located via `RomSet.Locate()`), so they are skipped when ROMs are
   missing.
+
+## Machine base class — `Tedd.MOS65xx.Emulator.Machines.CommodoreMachine`
+
+What the C64 and the C128 share, and what the hosting layer and the tools program against: the 6502-family CPU,
+VIC-II, both CIAs, SID + resampler, keyboard, joysticks, IEC bus and the optional 1541; `Clock()` (abstract, one
+system cycle), `RunFrame()`, `RunCycles()`, `StepInstruction()`, `Reset(hard)`, `AttachDrive()/DetachDrive()`,
+`AttachCartridge()`; memory access for tools (`PeekMemory`, `WriteMemory`, `Ram`, `ColorRam`, `VicMemory`,
+`VicBank`, `ScreenAddress`); `GetScreenText()`, `IsBasicReady()`, `WaitForBasicReady()`; typing through the KERNAL
+keyboard buffer (`TypeText`; buffer/count/size addresses are abstract: C64 $0277/$C6/$0289, C128 $034A/$D0/$0A20 or
+the C64 ones in C64 mode), the disk autostart helper and `InjectProgram` (BASIC pointers per machine: C64 $2D..$32/$AE,
+C128 TEXT_TOP $1210). `MachineModel { C64, C128 }`. `C64 : CommodoreMachine` keeps its previous public API.
+
+## Z80 — `Tedd.MOS65xx.Emulator.Cpu.Z80`
+
+```csharp
+public interface IZ80Bus : IBus { byte In(ushort port); void Out(ushort port, byte value); }
+public sealed partial class Z80
+{
+    public Z80(IZ80Bus bus);
+    public byte A, F, B, C, D, E, H, L, A2, F2, B2, C2, D2, E2, H2, L2, I, R; public ushort IX, IY, SP, PC, WZ; public byte Q;
+    public bool Iff1, Iff2; public int InterruptMode; public bool Halted;
+    public bool Irq;                 // /INT level
+    public void SetNmi(bool level);  // /NMI, edge latched
+    public int Step();               // one instruction (or interrupt acknowledge / HALT cycle); returns T-states
+    public void Reset();             // PC = 0, I = R = 0, IFF off, IM 0, AF = SP = $FFFF
+    public long Cycles, Instructions;
+}
+```
+
+Instruction stepped (not T-state stepped): a machine keeps a T-state budget and calls `Step()` while it is
+positive. Cycle counts are the documented ones incl. the conditional forms (JR/DJNZ/RET cc/CALL cc, block repeats
+21/16). Complete instruction set incl. the undocumented IXH/IXL/IYH/IYL forms, SLL, IN F,(C), OUT (C),0, duplicate
+NEG/RETN/IM opcodes and the DDCB/FDCB result-to-register forms; X/Y flag bits everywhere (CP from the operand, BIT
+n,(HL) from WZ, block instructions from B / PC when repeating), WZ (MEMPTR) rules, the Q latch (F after a
+flag-writing instruction, else 0; a DD/FD prefix clears it) for SCF/CCF, LD A,I/R with IFF2 in P, the block I/O
+repeat flag rules, EI delay, IM 2 vector from I:$FF. Verified against every SingleStepTests/z80 file
+(`HARTE_Z80_TESTS`, `Cpu/HarteZ80Tests`) and `Cpu/Z80Tests`. No allocations; `switch` decoders in `Z80.Execute.cs`
+(unprefixed) and `Z80.Prefixed.cs` (CB, ED, DDCB).
+
+## Commodore 128 — `Tedd.MOS65xx.Emulator.C128`
+
+```csharp
+public sealed class C128 : CommodoreMachine
+{
+    public C128(C128RomSet roms, int audioSampleRate = 44100);
+    public C128RomSet Roms; public C128Memory Memory; public Mmu8722 Mmu; public Z80 Z80; public Vdc8563 Vdc;
+    public bool Display40Columns;    // the 40/80 DISPLAY key (true = up = 40 columns), read by the KERNAL at reset / ESC X
+    public bool CapsLock;            // the CAPS LOCK key (8502 port bit 6)
+    public bool Z80Active, C64Mode;
+    public string GetVdcScreenText(); public string GetVdcScreenAscii();   // the 80 column screen
+}
+```
+
+Clocking (one system cycle, 985 248 Hz PAL like the C64):
+
+```
+vic.Clock(); cia1.Clock(); cia2.Clock();
+irq = vic.Irq || cia1.IrqLine; nmi = cia2.IrqLine || restore;
+if (z80 owns the bus)  { z80.Irq = irq; z80.SetNmi(nmi); if (!vic.Ba) { budget += 2; while (budget > 0) budget -= z80.Step(); } }
+else                   { cpu.Rdy = !vic.Ba; cpu.Irq = irq; cpu.Nmi = nmi; cpu.Clock(); if (vic.FastMode) cpu.Clock(); }
+audio.Clock(); vdc.Clock(); TOD ticks; 1541 at 1 MHz
+```
+
+The Z80 gets two T-states per system cycle (VICE: each memory or I/O transaction operates at 1 MHz, T-states are
+halved), does not run while BA is asserted, and the bus changes hands at instruction boundaries when MCR bit 0 is
+written. Reset starts the Z80 (MCR = 0): the boot BIOS at Z80 $0000 (the $D000 quarter of the KERNAL ROM) checks the
+cartridge lines and the C= key, programs the MMU, copies its switch code to $FFD0 and turns the 8502 on. In 2 MHz
+mode the 8502 gets two cycles per VIC cycle (no I/O clock stretching is modelled); the Z80 is unaffected.
+
+### MMU 8722 — `Mmu8722`
+
+Registers $D500-$D50B (I/O) and the always visible window $FF00-$FF04 (CR, and LCR A-D: writing loads CR from
+PCR A-D). CR: bit 0 I/O (0 = on), bit 1 BASIC low ROM (0 = ROM), bits 2-3 $8000-$BFFF (0 BASIC high, 1 internal
+function ROM, 2 external function ROM, 3 RAM), bits 4-5 $C000-$FFFF (0 editor/character ROM/KERNAL, 1/2 function ROM,
+3 RAM), bits 6-7 RAM bank (only bit 6 on a 128K machine). MCR: bit 0 CPU (0 = Z80, 1 = 8502), bit 1 fast serial
+direction, bit 6 written 1 = C64 mode (latched until reset); read back: bits 0-3 as written, bit 4 /GAME level,
+bit 5 /EXROM level, bit 6 = 0, bit 7 = 40/80 key (1 = 40 columns). RCR: bits 0-1 common RAM size 1K/4K/8K/16K,
+bit 2 common at the bottom, bit 3 at the top, bits 6-7 the VIC's 64K block. P0L/P0H, P1L/P1H: page (and bank) that
+CPU page 0 / page 1 are redirected to; the high byte is latched and committed by the low byte write; a target page
+in common RAM is forced to bank 0; the high bytes read with bits 4-7 set. Version register reads $20 (2 banks).
+`Changed` fires on anything that alters the map, `CpuSwitched` when bit 0 of the MCR flips.
+
+### Memory — `C128Memory : IBus, IVicMemory`
+
+256-entry page tables (read source array + offset, write target array + offset, kind) rebuilt from the MMU, the 8502
+port and the cartridge lines; a memory access is one table lookup. Rules: RAM from the CR bank with the common area
+always in bank 0; page 0 / page 1 relocated to P0 / P1 and the target pages appear in their place (exchange); the
+8502 port is always $0000/$0001; $FF00-$FF04 are the MMU in C128 mode; I/O when CR bit 0 = 0: VIC $D000-$D3FF, SID
+$D400-$D4FF, MMU $D500-$D50B (C128 mode only), VDC $D600/$D601, $D700 open, colour RAM $D800-$DBFF (1K bank chosen by
+port bit 0 for the CPU and bit 1 for the VIC; 1 = bank 0), CIA1 $DC00, CIA2 $DD00, cartridge I/O $DE00-$DFFF; with I/O
+off and the KERNAL selected the C128 character set sits at $D000. External function ROM = the cartridge's ROML/ROMH at
+$8000-$BFFF (bits 2-3 = 2) or ROMH at $C000-$FFFF (bits 4-5 = 2); the internal function ROM socket is empty (open bus).
+C64 mode: the C64 PLA from the port lines LORAM/HIRAM/CHAREN and the cartridge (incl. Ultimax), C64 BASIC/KERNAL, the
+C64 half of the character ROM, no MMU registers; the RAM bank and common area still apply.
+
+Z80 view (`Z80View : IZ80Bus`): $0000-$0FFF = the Z80 BIOS while RAM bank 0 is selected (whatever the other CR bits
+say; the boot BIOS switches to all-RAM in its second instruction and keeps running from ROM), bank 1 RAM otherwise;
+no processor port at $0000/$0001; everything else like the 8502. IN/OUT with a port address of $0000-$0FFF read/write
+the RAM under the I/O area ($D000-$DFFF of bank 0; with bank 1 selected they go to Z80 memory at the port address),
+$D000-$DFFF the I/O chips regardless of CR bit 0, other ports memory. (VICE's z80mem.c model.)
+
+VIC view: RCR bits 6-7 pick the 64K block, CIA2 the 16K bank, character ROM (C128 or C64 half) at $1000-$1FFF of
+banks 0 and 2, ROMH at $3000-$3FFF in Ultimax C64 mode.
+
+### VIC-IIe
+
+`new VicII(memory, c128: true)`: $D02F bits 0-2 = keyboard lines K0-K2 (bits 3-7 read 1), $D030 bit 0 = 2 MHz mode,
+bit 1 = test (bits 2-7 read 1). In 2 MHz mode the VIC keeps its raster timing and interrupts but performs no memory
+accesses (fetches read $FF) and never asserts BA. The C128 copies `KeyboardLines` into `Keyboard.ExtendedRowLevels`
+before each CIA1 port B read; the matrix has 11 rows (`C64Key` values 64-87: HELP, keypad, TAB, ESC, LINE FEED,
+ENTER, ALT, cursor keys, NO SCROLL). A C64 leaves the extra rows unselected.
+
+### VDC 8563 — `Tedd.MOS65xx.Emulator.Video.Vdc8563`
+
+```csharp
+public sealed class Vdc8563 : IClockable
+{
+    public Vdc8563(int ramSize = 16384);          // or 65536
+    public byte Read(int port); public byte Peek(int port); public void Write(int port, byte value);  // port 0 = $D600, 1 = $D601
+    public void Clock();                          // one system cycle; renders + FrameCompleted at the end of each VDC frame
+    public byte[] Ram; public uint[] Frame;       // 768 x 272 ARGB, the 640 x 200 display at (64, 36)
+    public const int FrameWidth = 768, FrameHeight = 272, DisplayX = 64, DisplayY = 36;
+    public static readonly uint[] Palette;        // 16 RGBI colours
+    public bool Ready, VerticalBlank; public int RasterLine; public byte Register(int index);
+    public string GetScreenText(Func<byte, char> convert);
+}
+```
+
+$D600 write selects a register (0-36), $D600 read = status: bit 7 ready, bit 6 light pen (never), bit 5 vertical
+blank (the raster is outside the displayed rows), bits 0-2 revision (default 1). $D601 reads/writes the selected
+register; R31 accesses RAM at R18/R19 and increments it (ready drops for 43 cycles inside the display, 4 outside);
+writing R30 runs a block fill (R31 value) or copy (R24 bit 7, source R32/R33) of R30 bytes (0 = 256) and updates the
+addresses (busy 0.66 / 1.2 cycles per byte, VICE's numbers). Unused register bits read as 1 (`ReadMask`), R16/R17 are
+read-only. Timing: a 16.16 fixed point accumulator adds 16 MHz / 985 248 Hz dots per cycle; a line is (R0 + 1) * 8
+dots, a frame (R4 + 1) * char height + R5 lines; the picture is rendered when the frame wraps. Rendering: text from
+R12/R13 (+ R27 per row) with attributes from R20/R21 when R25 bit 6 is set (bits 0-3 colour, 4 blink, 5 underline at
+R29, 6 reverse, 7 alternate set = +256), character data at R28 bits 5-7 x $2000 with 16 (or 32 for tall characters)
+bytes per glyph, R22 total/displayed width with semi-graphics (R25 bit 5) repeating the last pixel, double width
+pixels (R25 bit 4), the cursor R14/R15 with modes/lines from R10/R11, blink rates R24 bit 5, reverse screen R24 bit 6,
+bitmap mode (R25 bit 7, fg/bg from the attribute nibbles or R26). Not modelled: smooth scrolling, interlace, beam
+position dependent register effects.
+
+### ROM set — `C128RomSet`
+
+BASIC low/high (16K each, or one 32K image), KERNAL (16K: editor $C000, Z80 BIOS $D000, KERNAL $E000; or the 32K
+"complete" image of the C128DCR whose lower half is the C64 BASIC + KERNAL), 8K character ROM (C64 set first, C128
+set at $1000), the C64 BASIC/KERNAL, optional 1541 DOS. `Locate()` checks `C128_ROMS`, `C64_ROMS`, the base and
+current directory and the `roms` / `src/Tedd.MOS65xx.GUI` sub-directories of their ancestors. `ToC64RomSet()`.
+
+## Hosting additions for the C128
+
+`EmulatorSession(C128RomSet, ...)` creates a C128 (`columns80` presses the 40/80 key before boot);
+`Machine` is the `CommodoreMachine`, `C64` / `C128` are typed views, `Model`, `Roms` (the C64 set, for a C128 its C64
+mode ROMs), `C128Roms`, `HasDriveRom`, `RomDescription`. `Display` (`Auto` = follow the 40/80 key, `VicII`, `Vdc`),
+`ShowingVdc`, `CurrentFrame`, `Display40Columns`, `CapsLock`. `VideoFrame` carries `Source`, full and visible
+geometry (VIC-II 504 x 312 / 384 x 272, VDC 768 x 272); sinks size their targets from the frame. `SystemCommand`
+gained `ToggleColumns` and `CapsLock`, applied by the session and then reported. `KeyBindings.CreateDefault(model)`:
+the C64 layout gets the free keys for the C128 extras (Numpad 1/3/7/9, Page Down = HELP, Scroll Lock = NO SCROLL,
+Left Alt = ALT, Caps Lock); the C128 layout also maps Escape = ESC, Tab = TAB, End = RUN/STOP, Right Ctrl = C=, the
+whole keypad, the cursor keys and F9 = 40/80. `AttachDisk` with autostart resets a C128 when the disk has a boot
+sector (track 1 sector 0 "CBM"), which makes the KERNAL boot it (CP/M).
