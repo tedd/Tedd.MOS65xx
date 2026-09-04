@@ -39,7 +39,6 @@ public partial class CharsetViewerPage : ContentPage
 
     private readonly EmulatorRunner _runner;
     private readonly IDispatcherTimer _timer;
-    private readonly GlyphDrawable _glyph = new();
     private readonly byte[] _originalRom;
     private readonly string _charRomName;
     private KeyboardHook? _keyboard;
@@ -63,7 +62,6 @@ public partial class CharsetViewerPage : ContentPage
         _originalRom = (byte[])roms.Char.Clone();
         _charRomName = CharRomName(roms.Description);
         NotesText.Text = Notes;
-        Glyph.Drawable = _glyph;
         BuildOptionBoxes();
         Charset.SelectionChanged += (_, _) => UpdateCharacter();
         Charset.HoverChanged += (_, index) => HoverText.Text = DescribeShort(index);
@@ -96,6 +94,9 @@ public partial class CharsetViewerPage : ContentPage
             _keyboard.Dispose();
             _keyboard = null;
         }
+        // Frees the native pixel buffers behind the two pictures; the window is not reused.
+        Charset.Dispose();
+        Glyph.Dispose();
     }
 
     /// <summary>Arrow keys walk the grid, the way they did in the WPF viewer.</summary>
@@ -318,8 +319,7 @@ public partial class CharsetViewerPage : ContentPage
         var set = _set;
         if (set is null || set.Count == 0)
         {
-            _glyph.Clear();
-            Glyph.Invalidate();
+            Glyph.Clear();
             BytesText.Text = "";
             CharText.Text = "";
             return;
@@ -327,8 +327,7 @@ public partial class CharsetViewerPage : ContentPage
 
         int index = Math.Clamp(Charset.SelectedIndex, 0, set.Count - 1);
         var glyph = set.Glyph(index);
-        _glyph.SetGlyph(glyph, Charset.Ink, Charset.Paper);
-        Glyph.Invalidate();
+        Glyph.SetGlyph(glyph, Charset.Ink, Charset.Paper);
 
         var bytes = new StringBuilder("row byte  pixels\n");
         for (int row = 0; row < glyph.Length; row++)

@@ -105,10 +105,14 @@ Rendering tests write PNG frames to `TestResults/` next to the test assembly.
   editor (Tools menu) where you pick the keys that make up the joysticks, audio visualizer window.
 * **MAUI** (`src/Tedd.MOS65xx.Maui`): the WPF front-end above, feature for feature, on .NET MAUI - the same
   windows, the same key bindings file, and the tool windows redrawn with `Microsoft.Maui.Graphics` so they are
-  not tied to Windows. Only the Windows head is built (`net10.0-windows10.0.19041.0`, because the .NET 11 MAUI
-  workload is not published yet); the emulator picture, sound, the save dialog and the physical key reader are
-  the four pieces behind a platform boundary, so adding a macOS, Android or iOS head means installing that
-  workload, adding the TFM and implementing those.
+  not tied to Windows. Every picture made of C64 pixels - the screen, the character set grid, a blown up
+  character, the sprites and their thumbnails - is written into a `Tedd.WriteableBitmap.Maui` bitmap at one
+  bitmap pixel per C64 pixel and magnified by the GPU with nearest neighbour sampling, so a repaint costs what
+  the machine has rather than what the screen shows, and stays sharp at any zoom; grids, boxes and labels are
+  drawn in screen pixels on a transparent canvas over it. Only the Windows head is built
+  (`net10.0-windows10.0.19041.0`, because the .NET 11 MAUI workload is not published yet); the emulator picture,
+  sound, the save dialog and the physical key reader are the four pieces behind a platform boundary, so adding a
+  macOS, Android or iOS head means installing that workload, adding the TFM and implementing those.
 * **Web** (`src/Tedd.MOS65xx.Web`): runs entirely in the browser (video on a canvas, audio through an AudioWorklet),
   machine selector, C128 ROM slots, a menu that boots the shipped CP/M disks, the 40/80 key, drag-and-drop media,
   touch joystick, built-in tech demo.

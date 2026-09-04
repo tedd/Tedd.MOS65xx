@@ -6,16 +6,19 @@ namespace Tedd.MOS65xx.Maui.Views;
 /// Draws a whole character set as a grid of 8 x 8 glyphs in two C64 colors, with a hex gutter showing the first
 /// character code of each row.
 ///
-/// It is two stacked canvases: the glyphs themselves, which are only redrawn when the characters, colors or
-/// zoom change, and a transparent overlay with the gutter, grid, hover box and selection box, which is redrawn
-/// whenever the pointer moves. Each glyph row is emitted as merged horizontal runs, so even a 512 character ROM
-/// image is a few thousand rectangles rather than 32768.
+/// It is two stacked layers: the glyphs themselves, decoded into a <see cref="PixelSurface"/> at one bitmap pixel
+/// per character pixel and magnified by the GPU the same way the emulator picture is; and a transparent overlay
+/// canvas with the gutter, grid, hover box and selection box, which is redrawn whenever the pointer moves. So a
+/// 512 character ROM image costs 32768 pixel writes when the characters or colors change and nothing at all when
+/// only the zoom does - the CPU never draws a magnified glyph, whatever the zoom.
 /// </summary>
-public sealed class CharsetView : ContentView
+public sealed class CharsetView : ContentView, IDisposable
 {
-    private readonly GlyphLayer _glyphs = new();
+    private const int Size = CharacterSet.CharacterWidth;   // glyphs are square
+
+    private readonly PixelSurface _glyphs = new();
     private readonly OverlayLayer _overlay;
-    private readonly GraphicsView _glyphView;
+    private readonly View _glyphView;
     private readonly GraphicsView _overlayView;
 
     private CharacterSet? _source;
@@ -31,7 +34,9 @@ public sealed class CharsetView : ContentView
     public CharsetView()
     {
         _overlay = new OverlayLayer(this);
-        _glyphView = new GraphicsView { Drawable = _glyphs, InputTransparent = true };
+        _glyphView = _glyphs.View;
+        _glyphView.HorizontalOptions = LayoutOptions.Start;
+        _glyphView.VerticalOptions = LayoutOptions.Start;
         _overlayView = new GraphicsView { Drawable = _overlay, BackgroundColor = Microsoft.Maui.Graphics.Colors.Transparent };
 
         var pointer = new PointerGestureRecognizer();
@@ -75,11 +80,11 @@ public sealed class CharsetView : ContentView
         set { _columns = Math.Max(1, value); Rebuild(); }
     }
 
-    /// <summary>Screen pixels per character pixel.</summary>
+    /// <summary>Screen pixels per character pixel. The GPU does the magnifying, so this only resizes.</summary>
     public int Zoom
     {
         get => _zoom;
-        set { _zoom = Math.Clamp(value, 1, 24); Rebuild(); }
+        set { _zoom = Math.Clamp(value, 1, 24); Resize(); }
     }
 
     /// <summary>C64 color index (0..15) for set bits.</summary>
@@ -148,13 +153,59 @@ public sealed class CharsetView : ContentView
     /// <summary>Redraws everything from the source; call after the data behind a live set changed.</summary>
     public void Rebuild()
     {
+        Resize();
+        PaintGlyphs();
+    }
+
+    /// <summary>Lays the two layers out for the current zoom, without touching a single glyph pixel.</summary>
+    private void Resize()
+    {
         double cell = Cell;
-        WidthRequest = Gutter + _columns * cell;
-        HeightRequest = Math.Max(1, Rows * cell);
-        _glyphs.Update(_source, _columns, cell, Gutter, _ink, _paper);
-        _glyphView.Invalidate();
+        double width = _columns * cell, height = Math.Max(1, Rows * cell);
+        WidthRequest = Gutter + width;
+        HeightRequest = height;
+        // The bitmap covers the glyphs only; the overlay spans the gutter as well and draws the labels in it.
+        _glyphView.Margin = new Thickness(Gutter, 0, 0, 0);
+        _glyphView.WidthRequest = width;
+        _glyphView.HeightRequest = height;
         _overlayView.Invalidate();
     }
+
+    /// <summary>Decodes the character set into the surface, one bitmap pixel per character pixel.</summary>
+    private void PaintGlyphs()
+    {
+        var source = _source;
+        if (source is null || source.Count == 0)
+        {
+            _glyphView.IsVisible = false;
+            return;
+        }
+
+        int columns = _columns;
+        uint ink = C64Palette.NativeOf(_ink);
+        uint paper = C64Palette.NativeOf(_paper);
+        _glyphs.Paint(columns * Size, Rows * Size, (pixels, stride) =>
+        {
+            pixels.Fill(paper);
+            for (int index = 0; index < source.Count; index++)
+            {
+                var glyph = source.Glyph(index);
+                int left = index % columns * Size;
+                int top = index / columns * Size;
+                for (int row = 0; row < Size; row++)
+                {
+                    int bits = glyph[row];
+                    if (bits == 0) continue;    // the paper fill above already covers an empty row
+                    var line = pixels.Slice((top + row) * stride + left, Size);
+                    for (int x = 0; x < Size; x++)
+                        if (((bits >> (7 - x)) & 1) != 0) line[x] = ink;
+                }
+            }
+        });
+    }
+
+    /// <summary>Releases the native buffers behind the glyph picture.</summary>
+    public void Dispose() => _glyphs.Dispose();
 
     /// <summary>The character at a point in this view's coordinates, or -1 when there is none.</summary>
     public int IndexAt(Point? point)
@@ -181,59 +232,6 @@ public sealed class CharsetView : ContentView
         _hoverIndex = index;
         _overlayView.Invalidate();
         HoverChanged?.Invoke(this, index);
-    }
-
-    /// <summary>The glyphs themselves, redrawn only when the characters, colors or zoom change.</summary>
-    private sealed class GlyphLayer : IDrawable
-    {
-        private CharacterSet? _source;
-        private int _columns = 32;
-        private double _cell = 32;
-        private double _gutter;
-        private int _ink, _paper;
-
-        public void Update(CharacterSet? source, int columns, double cell, double gutter, int ink, int paper)
-        {
-            _source = source;
-            _columns = columns;
-            _cell = cell;
-            _gutter = gutter;
-            _ink = ink;
-            _paper = paper;
-        }
-
-        public void Draw(ICanvas canvas, RectF dirtyRect)
-        {
-            var source = _source;
-            if (source is null || source.Count == 0) return;
-            int size = CharacterSet.CharacterWidth;
-            float pixel = (float)(_cell / size);
-            int rows = (source.Count + _columns - 1) / _columns;
-
-            canvas.FillColor = C64Palette.Of(_paper);
-            canvas.FillRectangle((float)_gutter, 0, (float)(_columns * _cell), (float)(rows * _cell));
-            canvas.FillColor = C64Palette.Of(_ink);
-            for (int index = 0; index < source.Count; index++)
-            {
-                var glyph = source.Glyph(index);
-                float left = (float)(_gutter + index % _columns * _cell);
-                float top = (float)(index / _columns * _cell);
-                for (int row = 0; row < size; row++)
-                {
-                    int bits = glyph[row];
-                    if (bits == 0) continue;
-                    // Merge horizontal runs of set bits into one rectangle each.
-                    for (int x = 0; x < size; x++)
-                    {
-                        if (((bits >> (7 - x)) & 1) == 0) continue;
-                        int end = x;
-                        while (end + 1 < size && ((bits >> (7 - (end + 1))) & 1) != 0) end++;
-                        canvas.FillRectangle(left + x * pixel, top + row * pixel, (end - x + 1) * pixel, pixel);
-                        x = end;
-                    }
-                }
-            }
-        }
     }
 
     /// <summary>Gutter labels, grid, set divider, hover and selection: cheap, and redrawn on every pointer move.</summary>
@@ -310,16 +308,30 @@ public sealed class CharsetView : ContentView
 
 /// <summary>
 /// One character blown up to fill the view, with a pixel grid: the bit pattern of the 8 bytes behind a
-/// character, which is what you actually edit when designing a character set.
+/// character, which is what you actually edit when designing a character set. The 8 x 8 pixels are a
+/// <see cref="PixelSurface"/> like every other C64 picture; the grid and the border are drawn over it.
 /// </summary>
-internal sealed class GlyphDrawable : IDrawable
+public sealed class GlyphView : ContentView, IDisposable
 {
-    private static readonly Color GridColor = Color.FromRgba(0xFF, 0xFF, 0xFF, 0x60);
-    private static readonly Color BorderColor = Color.FromRgb(0x80, 0x80, 0x80);
+    private const int Size = CharacterSet.CharacterWidth;   // glyphs are square
+
+    private readonly PixelSurface _surface = new();
+    private readonly GraphicsView _overlayView;
 
     private readonly byte[] _rows = new byte[CharacterSet.CharacterHeight];
     private int _ink = 14;
     private int _paper = 6;
+
+    public GlyphView()
+    {
+        _overlayView = new GraphicsView
+        {
+            Drawable = new GridLayer(),
+            BackgroundColor = Microsoft.Maui.Graphics.Colors.Transparent,
+            InputTransparent = true,
+        };
+        Content = new Grid { Children = { _surface.View, _overlayView } };
+    }
 
     /// <summary>Shows the 8 rows of a character in the given C64 colors.</summary>
     public void SetGlyph(ReadOnlySpan<byte> glyph, int ink, int paper)
@@ -328,34 +340,55 @@ internal sealed class GlyphDrawable : IDrawable
         glyph.Slice(0, Math.Min(glyph.Length, _rows.Length)).CopyTo(_rows);
         _ink = ink & 0x0F;
         _paper = paper & 0x0F;
+        Paint();
     }
 
     /// <summary>Clears the view (no character selected).</summary>
-    public void Clear() => Array.Clear(_rows);
-
-    public void Draw(ICanvas canvas, RectF dirtyRect)
+    public void Clear()
     {
-        int size = CharacterSet.CharacterWidth;
-        float side = (float)Math.Floor(Math.Min(dirtyRect.Width, dirtyRect.Height) / size) * size;
-        if (side < size) return;
-        float pixel = side / size;
+        Array.Clear(_rows);
+        Paint();
+    }
 
-        canvas.FillColor = C64Palette.Of(_paper);
-        canvas.FillRectangle(0, 0, side, side);
-        canvas.FillColor = C64Palette.Of(_ink);
-        for (int row = 0; row < CharacterSet.CharacterHeight; row++)
-            for (int x = 0; x < size; x++)
-                if (((_rows[row] >> (7 - x)) & 1) != 0)
-                    canvas.FillRectangle(x * pixel, row * pixel, pixel, pixel);
+    public void Dispose() => _surface.Dispose();
 
-        canvas.StrokeSize = 1;
-        canvas.StrokeColor = GridColor;
-        for (int i = 1; i < size; i++)
+    private void Paint()
+    {
+        uint ink = C64Palette.NativeOf(_ink);
+        uint paper = C64Palette.NativeOf(_paper);
+        var rows = _rows;
+        _surface.Paint(Size, CharacterSet.CharacterHeight, (pixels, stride) =>
         {
-            canvas.DrawLine(i * pixel, 0, i * pixel, side);
-            canvas.DrawLine(0, i * pixel, side, i * pixel);
+            for (int row = 0; row < CharacterSet.CharacterHeight; row++)
+            {
+                var line = pixels.Slice(row * stride, Size);
+                for (int x = 0; x < Size; x++)
+                    line[x] = ((rows[row] >> (7 - x)) & 1) != 0 ? ink : paper;
+            }
+        });
+    }
+
+    /// <summary>The pixel grid and the border: screen pixels, so they stay on a canvas over the picture.</summary>
+    private sealed class GridLayer : IDrawable
+    {
+        private static readonly Color GridColor = Color.FromRgba(0xFF, 0xFF, 0xFF, 0x60);
+        private static readonly Color BorderColor = Color.FromRgb(0x80, 0x80, 0x80);
+
+        public void Draw(ICanvas canvas, RectF dirtyRect)
+        {
+            float side = Math.Min(dirtyRect.Width, dirtyRect.Height);
+            if (side < Size) return;
+            float pixel = side / Size;
+
+            canvas.StrokeSize = 1;
+            canvas.StrokeColor = GridColor;
+            for (int i = 1; i < Size; i++)
+            {
+                canvas.DrawLine(i * pixel, 0, i * pixel, side);
+                canvas.DrawLine(0, i * pixel, side, i * pixel);
+            }
+            canvas.StrokeColor = BorderColor;
+            canvas.DrawRectangle(0.5f, 0.5f, side - 1, side - 1);
         }
-        canvas.StrokeColor = BorderColor;
-        canvas.DrawRectangle(0.5f, 0.5f, side - 1, side - 1);
     }
 }

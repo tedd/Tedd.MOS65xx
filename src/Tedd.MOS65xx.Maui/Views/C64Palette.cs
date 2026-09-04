@@ -1,3 +1,4 @@
+using Tedd.Maui;
 using Tedd.MOS65xx.Emulator.Video;
 
 namespace Tedd.MOS65xx.Maui.Views;
@@ -10,6 +11,13 @@ internal static class C64Palette
 
     /// <summary>The same colors at half opacity, for the sprite boxes of the layout view.</summary>
     public static readonly Color[] Translucent = Build(0.5f);
+
+    /// <summary>
+    /// The same colors packed into the platform's native, premultiplied pixel layout, which is what a
+    /// <see cref="PixelSurface"/> is written in. Asked of the package rather than assumed, because the layout
+    /// differs between Windows and the mobile heads.
+    /// </summary>
+    public static readonly uint[] Native = BuildNative();
 
     public static readonly string[] Names =
     {
@@ -26,12 +34,23 @@ internal static class C64Palette
 
     public static Color Of(int index) => Colors[index & 15];
 
+    /// <summary>Palette entry <paramref name="index"/> as a <see cref="PixelSurface"/> pixel.</summary>
+    public static uint NativeOf(int index) => Native[index & 15];
+
     /// <summary>Black or white, whichever stays readable on <paramref name="index"/>.</summary>
     public static Color ContrastOf(int index)
     {
         uint argb = VicII.Palette[index & 15];
         int luma = ((int)((argb >> 16) & 0xFF) * 299 + (int)((argb >> 8) & 0xFF) * 587 + (int)(argb & 0xFF) * 114) / 1000;
         return luma > 110 ? Microsoft.Maui.Graphics.Colors.Black : Microsoft.Maui.Graphics.Colors.White;
+    }
+
+    private static uint[] BuildNative()
+    {
+        var native = new uint[Colors.Length];
+        for (int i = 0; i < native.Length; i++)
+            native[i] = WriteableBitmap.FromColor(Colors[i]);
+        return native;
     }
 
     private static Color[] Build(float alpha = 1f)

@@ -23,7 +23,6 @@ public partial class SpriteViewerPage : ContentPage
     private readonly SpriteSnapshot _snapshot = new();
     private readonly SpriteListItem[] _items = new SpriteListItem[8];
     private readonly byte[][] _pixels = new byte[8][];
-    private readonly SpriteDrawable _preview = new();
     private readonly SpriteLayoutDrawable _layout = new();
     private readonly StringBuilder _sb = new();
     private int _selected;
@@ -38,7 +37,6 @@ public partial class SpriteViewerPage : ContentPage
         InitializeComponent();
         _runner = runner;
         _setPaused = setPaused;
-        Preview.Drawable = _preview;
         LayoutView.Drawable = _layout;
 
         for (int n = 0; n < _items.Length; n++)
@@ -67,7 +65,14 @@ public partial class SpriteViewerPage : ContentPage
         Refresh();
     }
 
-    private void Page_Unloaded(object? sender, EventArgs e) => _timer.Stop();
+    private void Page_Unloaded(object? sender, EventArgs e)
+    {
+        _timer.Stop();
+        // Frees the native pixel buffers behind the nine sprite pictures; the window is not reused.
+        Preview.Dispose();
+        foreach (var item in _items)
+            item.Dispose();
+    }
 
     private void Freeze_Clicked(object? sender, EventArgs e)
     {
@@ -120,13 +125,10 @@ public partial class SpriteViewerPage : ContentPage
     {
         var sprite = _snapshot[_selected];
         bool expand = ExpandBox.IsChecked;
-        _preview.Zoom = ZoomLevels[Math.Clamp(ZoomBox.SelectedIndex, 0, ZoomLevels.Length - 1)];
-        _preview.ShowGrid = GridBox.IsChecked;
-        _preview.BackgroundColor = BackgroundBox.IsChecked ? _snapshot.BackgroundColor : -1;
-        _preview.SetSprite(_pixels[_selected], expand && sprite.ExpandX, expand && sprite.ExpandY);
-        Preview.WidthRequest = _preview.Width;
-        Preview.HeightRequest = _preview.Height;
-        Preview.Invalidate();
+        Preview.Zoom = ZoomLevels[Math.Clamp(ZoomBox.SelectedIndex, 0, ZoomLevels.Length - 1)];
+        Preview.ShowGrid = GridBox.IsChecked;
+        Preview.BackgroundColor = BackgroundBox.IsChecked ? _snapshot.BackgroundColor : -1;
+        Preview.SetSprite(_pixels[_selected], expand && sprite.ExpandX, expand && sprite.ExpandY);
     }
 
     private void UpdateDetail()
@@ -251,21 +253,20 @@ public partial class SpriteViewerPage : ContentPage
     }
 
     /// <summary>One entry of the sprite list: a 24 x 21 thumbnail plus a two line summary.</summary>
-    private sealed class SpriteListItem
+    private sealed class SpriteListItem : IDisposable
     {
         private static readonly Color SelectionEdgeLight = Color.FromRgb(0x30, 0x70, 0xC0);
         private static readonly Color SelectionEdgeDark = Color.FromRgb(0x5A, 0x9B, 0xE0);
         private static readonly Color SelectionFillLight = Color.FromRgb(0xDD, 0xE8, 0xF8);
         private static readonly Color SelectionFillDark = Color.FromRgb(0x26, 0x36, 0x4C);
 
-        private readonly SpriteThumbnailDrawable _drawable = new();
-        private readonly GraphicsView _thumbnail;
+        private readonly SpriteThumbnailView _thumbnail;
         private readonly Label _summary;
         private readonly Border _border;
 
         public SpriteListItem(int index, Action<int> select)
         {
-            _thumbnail = new GraphicsView { Drawable = _drawable, WidthRequest = 48, HeightRequest = 42 };
+            _thumbnail = new SpriteThumbnailView { WidthRequest = 48, HeightRequest = 42 };
             _summary = new Label { FontFamily = "Consolas", FontSize = 11 };
             _summary.SetAppThemeColor(Label.TextColorProperty, Color.FromRgb(0x50, 0x50, 0x50), Color.FromRgb(0xA8, 0xA8, 0xA8));
             var title = new Label { Text = "Sprite " + index, FontFamily = "Consolas", FontSize = 12, FontAttributes = FontAttributes.Bold };
@@ -311,10 +312,11 @@ public partial class SpriteViewerPage : ContentPage
             }
         }
 
+        public void Dispose() => _thumbnail.Dispose();
+
         public void Update(SpriteInfo sprite, byte[] pixels)
         {
-            _drawable.SetSprite(pixels);
-            _thumbnail.Invalidate();
+            _thumbnail.SetSprite(pixels);
 
             var flags = new List<string>(6) { sprite.Enabled ? "on" : "off" };
             if (sprite.Multicolor) flags.Add("MC");

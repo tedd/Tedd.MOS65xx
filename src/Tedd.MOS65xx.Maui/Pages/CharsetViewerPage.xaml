@@ -55,7 +55,7 @@
 
                     <Label Text="Selected character" FontAttributes="Bold" Margin="0,0,0,4" />
                     <HorizontalStackLayout Spacing="14" Margin="0,0,0,6">
-                        <GraphicsView x:Name="Glyph" WidthRequest="120" HeightRequest="120" VerticalOptions="Start" />
+                        <views:GlyphView x:Name="Glyph" WidthRequest="120" HeightRequest="120" VerticalOptions="Start" />
                         <Label x:Name="BytesText" Style="{StaticResource Mono}" VerticalOptions="Start" />
                     </HorizontalStackLayout>
                     <Label x:Name="CharText" Style="{StaticResource Mono}" Margin="0,0,0,12" />
