@@ -155,29 +155,54 @@ public sealed class SpriteView : ContentView, IDisposable
     }
 }
 
-/// <summary>A 24 x 21 sprite at two screen pixels per sprite pixel, for the list on the left.</summary>
-public sealed class SpriteThumbnailView : ContentView, IDisposable
+/// <summary>
+/// A 24 x 21 sprite at two screen pixels per sprite pixel, for the list on the left. This one stays on the
+/// vector canvas rather than becoming a <see cref="PixelSurface"/> like the big preview above: there are eight
+/// of them and they are refreshed ten times a second, and a GPU surface asks the UI thread for a great deal
+/// more work per redraw than a canvas does - eighty of those a second is enough on its own to leave the whole
+/// window sluggish. A thumbnail is also never magnified, which is where the pixel path earns its keep.
+/// </summary>
+internal sealed class SpriteThumbnailDrawable : IDrawable
 {
-    /// <summary>Sprite pixels per checkerboard cell; three of them are the six screen pixels of the old view.</summary>
-    private const int Checker = 3;
+    private static readonly Color CheckerDark = Color.FromRgb(0x24, 0x24, 0x24);
+    private static readonly Color CheckerLight = Color.FromRgb(0x30, 0x30, 0x30);
 
-    private readonly PixelSurface _surface = new();
+    private byte[] _pixels = Array.Empty<byte>();
 
-    public SpriteThumbnailView()
+    public void SetSprite(byte[] pixels) => _pixels = pixels;
+
+    public void Draw(ICanvas canvas, RectF dirtyRect)
     {
-        Content = _surface.View;
-    }
-
-    /// <summary>Shows <paramref name="pixels"/> (the array is read while painting, so it must stay 24 x 21).</summary>
-    public void SetSprite(byte[] pixels)
-    {
-        if (!SpritePixels.IsComplete(pixels)) return;
+        float cw = dirtyRect.Width / SpriteSnapshot.Width;
+        float ch = dirtyRect.Height / SpriteSnapshot.Height;
         // Transparent pixels get a checkerboard so an empty sprite is not just a blank box.
-        _surface.Paint(SpriteSnapshot.Width, SpriteSnapshot.Height,
-            (target, stride) => SpritePixels.Paint(target, stride, pixels, -1, Checker));
+        DrawChecker(canvas, dirtyRect.Width, dirtyRect.Height, cw * 3);
+        if (!SpritePixels.IsComplete(_pixels)) return;
+        for (int y = 0; y < SpriteSnapshot.Height; y++)
+        {
+            for (int x = 0; x < SpriteSnapshot.Width; x++)
+            {
+                byte c = _pixels[y * SpriteSnapshot.Width + x];
+                if (c == SpriteSnapshot.Transparent) continue;
+                int runEnd = x;
+                while (runEnd + 1 < SpriteSnapshot.Width && _pixels[y * SpriteSnapshot.Width + runEnd + 1] == c)
+                    runEnd++;
+                canvas.FillColor = C64Palette.Of(c);
+                canvas.FillRectangle(x * cw, y * ch, (runEnd - x + 1) * cw, ch);
+                x = runEnd;
+            }
+        }
     }
 
-    public void Dispose() => _surface.Dispose();
+    private static void DrawChecker(ICanvas canvas, float width, float height, float cell)
+    {
+        canvas.FillColor = CheckerDark;
+        canvas.FillRectangle(0, 0, width, height);
+        canvas.FillColor = CheckerLight;
+        for (float y = 0, row = 0; y < height; y += cell, row++)
+            for (float x = row % 2 == 0 ? 0 : cell; x < width; x += 2 * cell)
+                canvas.FillRectangle(x, y, Math.Min(cell, width - x), Math.Min(cell, height - y));
+    }
 }
 
 /// <summary>

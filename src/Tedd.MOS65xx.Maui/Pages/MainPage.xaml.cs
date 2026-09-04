@@ -19,6 +19,21 @@ public partial class MainPage : ContentPage
     public static readonly string BindingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Tedd.MOS65xx", "keybindings.json");
 
+    /// <summary>
+    /// How often the emulator thread is invited to publish a frame at normal speed: a little shorter than the
+    /// 20 ms of a PAL frame, so every frame the machine draws finds an invitation waiting and none is dropped.
+    /// </summary>
+    private static readonly TimeSpan NormalFrameInterval = TimeSpan.FromMilliseconds(16);
+
+    /// <summary>
+    /// The same while warping. The machine then draws frames several hundred times a second and there is no
+    /// point showing them all: a redraw is a swap chain present, and asking for one as often as the display
+    /// refreshes leaves this thread with no time between presents for the mouse - and the compositor with none
+    /// for the rest of the desktop, which is why warp used to slow down windows belonging to other programs.
+    /// Fifteen a second is plenty to watch a machine race, and leaves the window as responsive as ever.
+    /// </summary>
+    private static readonly TimeSpan WarpFrameInterval = TimeSpan.FromMilliseconds(66);
+
     private readonly ToolWindow<MemoryViewerPage> _memoryViewer = new();
     private readonly ToolWindow<SpriteViewerPage> _spriteViewer = new();
     private readonly ToolWindow<AudioVisualizerPage> _audioVisualizer = new();
@@ -31,6 +46,7 @@ public partial class MainPage : ContentPage
     private AudioTap? _audioTap;
     private KeyboardHook? _keyboard;
     private IDispatcherTimer? _statusTimer;
+    private IDispatcherTimer? _frameTimer;
     private Window? _window;
     private string? _diskPath;
     private string _romDescription = "";
@@ -94,6 +110,14 @@ public partial class MainPage : ContentPage
         _statusTimer.Interval = TimeSpan.FromMilliseconds(250);
         _statusTimer.Tick += (_, _) => UpdateStatus();
         _statusTimer.Start();
+
+        // This thread, not the machine, decides how often the picture is drawn: the emulator thread publishes a
+        // frame only once this has asked for one, and it asks from its own message loop, so a thread that falls
+        // behind simply asks later. See MauiVideoSink.RequestFrame.
+        _frameTimer = Dispatcher.CreateTimer();
+        _frameTimer.Interval = NormalFrameInterval;
+        _frameTimer.Tick += (_, _) => _videoSink?.RequestFrame();
+        _frameTimer.Start();
         _runner.Start();
     }
 
@@ -103,6 +127,8 @@ public partial class MainPage : ContentPage
     {
         _statusTimer?.Stop();
         _statusTimer = null;
+        _frameTimer?.Stop();
+        _frameTimer = null;
         if (_window is not null)
         {
             _window.Deactivated -= OnWindowDeactivated;
@@ -216,6 +242,13 @@ public partial class MainPage : ContentPage
     {
         if (_runner is null) return;
         _runner.Warp = warp;
+        if (_frameTimer is not null)
+        {
+            // Ask for the picture less often while the machine races; see WarpFrameInterval.
+            _frameTimer.Stop();
+            _frameTimer.Interval = warp ? WarpFrameInterval : NormalFrameInterval;
+            _frameTimer.Start();
+        }
         UpdateMenuGestures();
     }
 

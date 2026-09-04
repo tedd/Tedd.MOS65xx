@@ -23,6 +23,9 @@ public sealed class MauiVideoSink : IVideoSink, IDisposable
     private static readonly bool NativeMatchesFrame =
         WriteableBitmap.FromRgba(0x12, 0x34, 0x56, 0xFF) == 0xFF123456u;
 
+    /// <summary>1 while the UI thread wants a frame; see <see cref="RequestFrame"/>.</summary>
+    private int _frameWanted = 1;
+
     public MauiVideoSink()
     {
         Bitmap = new WriteableBitmap(VicII.VisibleArea.Width, VicII.VisibleArea.Height);
@@ -37,11 +40,28 @@ public sealed class MauiVideoSink : IVideoSink, IDisposable
     /// <summary>Frames received so far.</summary>
     public long FramesPresented { get; private set; }
 
+    /// <summary>Of those, the ones actually put on screen; the rest arrived without a token and were dropped.</summary>
+    public long FramesPublished { get; private set; }
+
+    /// <summary>
+    /// The UI thread is ready for another frame. It calls this from its own timer, and that is what keeps the
+    /// picture off the machine's clock: publishing a frame asks the view for a redraw, and a redraw is a swap
+    /// chain present, so a machine producing frames hundreds of times a second in warp would ask for hundreds
+    /// of presents a second. That does not merely outrun this window - it outruns the display and saturates the
+    /// compositor, which is why warp used to leave the whole desktop, and not only this app, unable to answer
+    /// the mouse. Because the token is handed out by the UI thread's own message loop, a thread that has fallen
+    /// behind simply stops handing them out, so the picture can never be asked for faster than it can be drawn,
+    /// whatever the machine is doing. Frames arriving without a token are dropped before they are copied, which
+    /// makes warp a little faster for it.
+    /// </summary>
+    public void RequestFrame() => Volatile.Write(ref _frameWanted, 1);
+
     /// <summary>Called on the emulator thread.</summary>
     public void PresentFrame(in VideoFrame frame)
     {
         FramesPresented++;
         if (frame.Width != Width || frame.Height != Height) return;
+        if (Interlocked.Exchange(ref _frameWanted, 0) == 0) return;
         // Non-blocking: a tick is dropped only while the GPU still holds every back buffer.
         if (!Bitmap.TryBeginWrite(out var write)) return;
         try
@@ -70,6 +90,7 @@ public sealed class MauiVideoSink : IVideoSink, IDisposable
         {
             // Publishes the buffer as the newest frame and asks the view for one coalesced redraw.
             write.Dispose();
+            FramesPublished++;
         }
     }
 
